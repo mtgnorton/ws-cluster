@@ -1,0 +1,24 @@
+env: local # local, dev, prod
+server:
+  node: 100
+  Port: 8080
+log:
+  path: /Users/mtgnorton/Coding/go/src/github.com/mtgnorton/ws-cluster/logs
+  print: true # 是否打印日志
+  level: debug # 日志级别 debug, info, warn, error,dpanic, panic, fatal
+  max_age: 7 # 日志保存天数
+  max_size: 100 # 单个日志文件大小，单位MB
+  max_backups: 10 # 日志文件最大备份数
+  compress: true # 是否压缩日志
+redis:
+  addr: localhost:6379
+  port: 6379
+  user: ""
+  password: ""
+  db: 3
+redis_queue:
+  addr: localhost:6379
+  port:
+  user: ""
+  password: ""
+  db: 4
