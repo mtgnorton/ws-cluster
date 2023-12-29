@@ -3,8 +3,7 @@ package queue
 import (
 	"context"
 	"github.com/mtgnorton/ws-cluster/dispatcher"
-	"github.com/mtgnorton/ws-cluster/handler"
-	"github.com/mtgnorton/ws-cluster/parse"
+	"github.com/mtgnorton/ws-cluster/message"
 	"github.com/mtgnorton/ws-cluster/shared"
 )
 
@@ -39,13 +38,13 @@ func WithShared(s *shared.Shared) Option {
 	}
 }
 
-func WithParser(p parse.Parser) Option {
+func WithParser(p message.WsParser) Option {
 	return func(o *Options) {
 		o.parser = p
 	}
 }
 
-func WithHandler(h handler.Handler) Option {
+func WithHandler(h handle.Handler) Option {
 	return func(o *Options) {
 		o.handler = h
 	}

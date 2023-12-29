@@ -41,13 +41,16 @@
 
 1. 推送接口：`/ws/push` 参数：
     ```
-   请求参数
+   如果指定了uids,client_ids,tags,则会将所有条件求交集
+   请求参数 
      pid(项目 id) 必选
-     uid(用户 id) 可选
-     client_id(客户端 id) 可选
+     uids(用户 id) 可选 多个用逗号分隔
+     client_ids(客户端 id) 可选 多个用逗号分隔
+     tags (标签) 可选 多个用逗号分隔
      sign(签名) 必选
      data(数据) 必选
    ```
+   
 
 
 

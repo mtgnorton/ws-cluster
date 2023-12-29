@@ -9,6 +9,8 @@ import (
 	"os"
 )
 
+var DefaultLogger *zap.SugaredLogger = NewZapLogger(config.DefaultConfig)
+
 func NewZapLogger(config config.Config) *zap.SugaredLogger {
 	normalWriter := normalWriter(config)
 	errorWriter := errorWriter(config)

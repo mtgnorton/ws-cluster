@@ -3,13 +3,12 @@ package client
 import (
 	"fmt"
 	"github.com/gorilla/websocket"
-	"github.com/mtgnorton/ws-cluster/shared"
 	"sync"
 	"time"
 )
 
 type defaultClient struct {
-	opts            Options
+	opts            *Options
 	ID              string
 	UID             string
 	PID             string
@@ -21,13 +20,12 @@ type defaultClient struct {
 
 func (d *defaultClient) Init(opts ...Option) {
 	for _, o := range opts {
-		o(&d.opts)
+		o(d.opts)
 	}
-
 }
 
 func (d *defaultClient) Options() Options {
-	return d.opts
+	return *d.opts
 }
 
 func (d *defaultClient) Send(message interface{}) {
@@ -78,14 +76,23 @@ func (d *defaultClient) String() string {
 	return fmt.Sprintf("Client[ID:%s,UID:%s,PID:%s]", d.ID, d.UID, d.PID)
 }
 
+func (d *defaultClient) sendLoop() {
+	for {
+		select {
+		case message, ok := <-d.messageChan:
+			if !ok {
+				return
+			}
+			if err := d.socket.WriteJSON(message); err != nil {
+				return
+			}
+		}
+	}
+}
+
 func NewClient(uid string, pid string, socket *websocket.Conn, options ...Option) Client {
-	opts := Options{
-		SnowflakeNode: shared.DefaultShared.SnowflakeNode,
-	}
-	for _, o := range options {
-		o(&opts)
-	}
-	return &defaultClient{
+	opts := NewOptions(options...)
+	c := &defaultClient{
 		opts:        opts,
 		ID:          opts.SnowflakeNode.Generate().String(),
 		UID:         uid,
@@ -93,4 +100,6 @@ func NewClient(uid string, pid string, socket *websocket.Conn, options ...Option
 		socket:      socket,
 		messageChan: make(chan interface{}),
 	}
+	go c.sendLoop()
+	return c
 }

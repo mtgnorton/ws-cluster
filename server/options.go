@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/mtgnorton/ws-cluster/config"
 	"github.com/mtgnorton/ws-cluster/manager"
-	"github.com/mtgnorton/ws-cluster/parse"
+	"github.com/mtgnorton/ws-cluster/message"
 	"github.com/mtgnorton/ws-cluster/queue"
 	"github.com/mtgnorton/ws-cluster/shared"
 )
@@ -70,7 +70,7 @@ func WithQueue(q queue.Queue) Option {
 		o.queue = q
 	}
 }
-func WithParser(p parse.Parser) Option {
+func WithParser(p message.WsParser) Option {
 	return func(o *Options) {
 		o.parser = p
 	}

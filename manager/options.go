@@ -14,6 +14,18 @@ type Options struct {
 
 type Option func(*Options)
 
+func NewOptions(opts ...Option) Options {
+	options := Options{
+		ctx:    context.Background(),
+		config: config.DefaultConfig,
+		logger: zap.NewNop().Sugar(),
+	}
+	for _, o := range opts {
+		o(&options)
+	}
+	return options
+}
+
 func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
 		o.ctx = ctx

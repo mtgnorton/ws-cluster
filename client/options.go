@@ -2,6 +2,7 @@ package client
 
 import (
 	"github.com/bwmarrin/snowflake"
+	"github.com/mtgnorton/ws-cluster/shared"
 )
 
 type Device string
@@ -24,6 +25,16 @@ type Option func(o *Options)
 
 type Options struct {
 	SnowflakeNode *snowflake.Node
+}
+
+func NewOptions(opts ...Option) *Options {
+	options := &Options{
+		SnowflakeNode: shared.DefaultShared.SnowflakeNode,
+	}
+	for _, o := range opts {
+		o(options)
+	}
+	return options
 }
 
 func WithSnowflakeNode(s *snowflake.Node) Option {

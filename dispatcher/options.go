@@ -6,7 +6,6 @@ import (
 	"github.com/mtgnorton/ws-cluster/handler"
 	"github.com/mtgnorton/ws-cluster/logger"
 	"github.com/mtgnorton/ws-cluster/message"
-	"github.com/mtgnorton/ws-cluster/parse"
 	"go.uber.org/zap"
 )
 
@@ -15,7 +14,7 @@ type Options struct {
 	config   config.Config
 	logger   *zap.SugaredLogger
 	handlers map[message.Type]handler.Handler
-	parser   parse.Parser
+	parser   message.WsParser
 }
 type Option func(*Options)
 
@@ -29,7 +28,7 @@ func newOptions(opts ...Option) Options {
 			message.TypeUnsubscribe: handler.NewUnSubscribeHandler(),
 			message.TypePush:        handler.NewPushHandler(),
 		},
-		parser: parse.DefaultParser,
+		parser: message.DefaultParser,
 	}
 	for _, o := range opts {
 		o(&options)

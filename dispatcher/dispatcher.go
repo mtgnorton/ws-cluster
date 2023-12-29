@@ -1,6 +1,8 @@
 package dispatcher
 
-import "github.com/mtgnorton/ws-cluster/handler"
+import (
+	"github.com/mtgnorton/ws-cluster/handler"
+)
 
 var DefaultDispatcher = NewDefaultDispatcher()
 
@@ -27,17 +29,22 @@ func (d *defaultDispatcher) Dispatch(msg []byte) (isAck bool) {
 	// Parse the message
 	req, err := d.opts.parser.Parse(msg)
 	if err != nil {
-		d.opts.logger.Warnf("Failed to parse message: %s", err.Error()
+		d.opts.logger.Warnf("Failed to parse message: %s", err.Error())
 		return false
 	}
 	var (
-		handler handler.Handler
-		ok      bool
+		h  handler.Handler
+		ok bool
 	)
 
-	if handler, ok = d.opts.handlers[req.Type]; !ok {
+	if h, ok = d.opts.handlers[req.Type]; !ok {
 		d.opts.logger.Warnf("No handler for message type: %s", req.Type)
 		return false
 	}
-	return handler.Handle(req)
+	r, err := h.Handle(req)
+	if err != nil {
+		d.opts.logger.Warnf("Failed to handle message: %s", err.Error())
+		return false
+	}
+	return r
 }
