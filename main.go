@@ -1,9 +1,11 @@
 package main
 
 import (
-	"github.com/mtgnorton/ws-cluster/server"
+	httpServer "github.com/mtgnorton/ws-cluster/http/server"
+	wsServer "github.com/mtgnorton/ws-cluster/ws/server"
 )
 
 func main() {
-	server.New().Run()
+	go httpServer.New().Run()
+	wsServer.New().Run()
 }

@@ -19,7 +19,7 @@ type Shared struct {
 }
 
 func NewShared(c config.Config) (s *Shared) {
-	snowflakeNode, err := snowflake.NewNode(c.Values().Server.Node)
+	snowflakeNode, err := snowflake.NewNode(c.Values().Node)
 	if err != nil {
 		panic(err)
 	}

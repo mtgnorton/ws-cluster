@@ -1,6 +1,8 @@
 package handler
 
-import "github.com/mtgnorton/ws-cluster/client"
+import (
+	"github.com/mtgnorton/ws-cluster/core/client"
+)
 
 func intersect(s1, s2 []client.Client) (c []client.Client) {
 	if len(s1) == 0 || len(s2) == 0 {

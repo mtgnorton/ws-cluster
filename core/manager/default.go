@@ -1,7 +1,7 @@
 package manager
 
 import (
-	"github.com/mtgnorton/ws-cluster/client"
+	"github.com/mtgnorton/ws-cluster/core/client"
 	"sync"
 	"time"
 )
@@ -16,12 +16,14 @@ type manager struct {
 }
 
 func (m *manager) Join(client client.Client) {
+
 	id, uid, pid := client.GetIDs()
 	m.Lock()
 	defer m.Unlock()
 	m.clients[id] = client
 	m.uClients[uid] = append(m.uClients[uid], id)
 	m.pClients[pid] = append(m.pClients[pid], id)
+	m.opts.logger.Debugf("manager-join client %s", client)
 }
 
 func (m *manager) Remove(client client.Client) {
@@ -40,6 +42,7 @@ func (m *manager) Remove(client client.Client) {
 			m.pClients[pid] = append(m.pClients[pid][:i], m.pClients[pid][i+1:]...)
 		}
 	}
+	m.opts.logger.Debugf("manager-remove client %s", client)
 }
 
 func (m *manager) Gets(clientIDs ...string) []client.Client {
@@ -128,6 +131,7 @@ func (m *manager) BindTag(client client.Client, tags ...string) {
 	for _, tag := range tags {
 		m.tagClients[tag] = append(m.tagClients[tag], id)
 	}
+	m.opts.logger.Debugf("manager-BindTag  %s to client %s", tags, client)
 }
 func (m *manager) UnbindTag(client client.Client, tags ...string) {
 	m.Lock()
@@ -140,6 +144,7 @@ func (m *manager) UnbindTag(client client.Client, tags ...string) {
 			}
 		}
 	}
+	m.opts.logger.Debugf("manager-UnbindTag  %s from client %s", tags, client)
 }
 
 func NewManager(opts ...Option) Manager {

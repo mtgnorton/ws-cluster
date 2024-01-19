@@ -15,18 +15,22 @@ const (
 )
 
 type Values struct {
-	Env        Env    `mapstructure:"env"`
-	Server     Server `mapstructure:"server"`
-	Log        Log    `mapstructure:"log"`
-	Redis      Redis  `mapstructure:"redis"`
-	RedisQueue Redis  `mapstructure:"redis_queue"`
+	Env        Env        `mapstructure:"env"`
+	Node       int64      `mapstructure:"node"`
+	WsServer   WsServer   `mapstructure:"ws_server"`
+	HttpServer HttpServer `mapstructure:"http_server"`
+	Log        Log        `mapstructure:"log"`
+	Redis      Redis      `mapstructure:"redis"`
+	RedisQueue Redis      `mapstructure:"redis_queue"`
 }
 
-type Server struct {
-	Node int64 `mapstructure:"node"`
-	Port int   `mapstructure:"port"`
+type WsServer struct {
+	Port int `mapstructure:"port"`
 }
 
+type HttpServer struct {
+	Port int `mapstructure:"port"`
+}
 type Log struct {
 	Path       string `mapstructure:"path"`
 	Print      bool   `mapstructure:"print"`
@@ -48,7 +52,6 @@ func NewViperConfig() Config {
 
 	c := &viperConfig{}
 	c.load()
-
 	return c
 
 }

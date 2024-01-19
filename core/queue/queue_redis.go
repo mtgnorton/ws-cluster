@@ -14,18 +14,19 @@ type RedisQueue struct {
 }
 
 func NewRedisQueue(opts ...Option) (q Queue) {
+
 	defer func() {
 		go func() {
 			_ = q.Consume(q.Options().ctx, TopicDefault)
 
 		}()
 	}()
-	options := newOptions(opts...)
+	options := NewOptions(opts...)
 
 	return &RedisQueue{
 		opts:         options,
-		groupName:    "group-" + fmt.Sprint(options.shared.Config.Values().Server.Node),
-		consumerName: "consumer-" + fmt.Sprint(options.shared.Config.Values().Server.Node),
+		groupName:    "group-" + fmt.Sprint(options.shared.Config.Values().Node),
+		consumerName: "consumer-" + fmt.Sprint(options.shared.Config.Values().Node),
 	}
 }
 
@@ -42,7 +43,7 @@ func (q *RedisQueue) Publish(ctx context.Context, topic Topic, message []byte) e
 	}).Err()
 }
 
-func (q *RedisQueue) Consume(ctx context.Context, topic Topic) error {
+func (q *RedisQueue) Consume(ctx context.Context, topic Topic) (err error) {
 	queueRedis := q.opts.shared.QueueRedis
 	logger := q.opts.shared.Logger
 	r1, err := queueRedis.XGroupCreateMkStream(ctx, string(topic), q.groupName, "$").Result()
@@ -64,12 +65,13 @@ func (q *RedisQueue) Consume(ctx context.Context, topic Topic) error {
 		} else {
 			currentID = ">"
 		}
+
 		streams, err := queueRedis.XReadGroup(ctx, &redis.XReadGroupArgs{
 			Group:    q.groupName,
 			Consumer: q.consumerName,
 			Streams:  []string{string(topic), currentID},
 			Block:    1,
-			Count:    100,
+			Count:    50,
 		}).Result()
 
 		if err != nil && strings.Contains(err.Error(), "i/o timeout") {
@@ -85,21 +87,24 @@ func (q *RedisQueue) Consume(ctx context.Context, topic Topic) error {
 		}
 		for _, message := range streams[0].Messages {
 			logger.Debugf("consume topic:%s,message id:%s,values:%s", topic, message.ID, message.Values)
-			msg, err := q.opts.parser.Parse([]byte(message.Values["m"].(string)))
-			if err != nil {
-				logger.Warnf("consume failed to parse message: %s,err:%v", message.Values["m"].(string), err)
-				continue
-			}
-			if err := q.opts.handler.Handle(msg); err != nil {
-				logger.Warnf("consume failed to handle message: %s,err:%v", message.Values["m"].(string), err)
-				continue
-			} else {
+			//msg, err := q.opts.parser.Parse([]byte(message.Values["m"].(string)))
+			//if err != nil {
+			//	logger.Warnf("consume failed to parse message: %s,err:%v", message.Values["m"].(string), err)
+			//	continue
+			//}
+
+			// 可能的情况
+			// 1. 该消息不属于该服务端，此时isAck为false，不需要ack
+			// 2. 该消息属于该服务端，但是处理失败，此时isAck为false，不需要ack
+
+			if isAck := q.opts.handler.Handle([]byte(message.Values["m"].(string))); isAck {
 				_, err := queueRedis.XAck(ctx, string(topic), q.groupName, message.ID).Result()
 				if err != nil {
 					logger.Warnf("consume failed to ack message: %s,err:%v", message.Values["m"].(string), err)
 					continue
 				}
 			}
+
 			lastID = message.ID
 		}
 	}

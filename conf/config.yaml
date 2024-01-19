@@ -1,7 +1,11 @@
 env: local # local, dev, prod
-server:
-  node: 100
-  Port: 8080
+node: 100 # 节点编号
+
+ws_server:
+  port: 8084
+http_server:
+  port: 8085
+
 log:
   path: /Users/mtgnorton/Coding/go/src/github.com/mtgnorton/ws-cluster/logs
   print: true # 是否打印日志

@@ -4,8 +4,8 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gfile"
-	"github.com/mtgnorton/ws-cluster/client"
-	"github.com/mtgnorton/ws-cluster/queue"
+	"github.com/mtgnorton/ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/ws/message"
 )
 
 type gfServer struct {
@@ -15,8 +15,8 @@ type gfServer struct {
 
 func New(opts ...Option) Server {
 	return &gfServer{
-		opts:   newOptions(opts...),
-		server: g.Server(),
+		opts:   NewOptions(opts...),
+		server: g.Server("ws"),
 	}
 }
 
@@ -39,6 +39,7 @@ func (s *gfServer) Run() {
 		s.connect(r)
 	})
 	s.server.SetServerRoot(gfile.MainPkgPath())
+	s.opts.shared.Logger.Debugf("ws server run on port:%d", s.opts.port)
 	s.server.SetPort(s.opts.port)
 	s.server.Run()
 }
@@ -59,8 +60,19 @@ func (s *gfServer) connect(r *ghttp.Request) {
 		r.Exit()
 	}
 
-	c := client.NewClient("1", "2", socket.Conn)
+	uid := r.Get("uid").String()
+	if uid == "" {
+		logger.Debugf("Websocket uid is empty")
+		r.Exit()
+	}
+	pid := r.Get("pid").String()
+	if pid == "" {
+		logger.Debugf("Websocket pid is empty")
+		r.Exit()
+	}
+	c := client.NewClient(uid, pid, socket.Conn)
 	s.opts.manager.Join(c)
+	c.Send(message.NewSuccessRes("connect success", ""))
 	for {
 		_, rawMsg, err := socket.ReadMessage()
 		if err != nil {
@@ -68,14 +80,7 @@ func (s *gfServer) connect(r *ghttp.Request) {
 			s.opts.manager.Remove(c)
 			return
 		}
-		logger.Debugf("Websocket ReadMessage rawMsg: %s", rawMsg)
-
-		err = s.opts.queue.Publish(s.opts.ctx, queue.TopicDefault, rawMsg)
-		if err != nil {
-			logger.Warnf("Websocket Publish err: %v", err)
-			continue
-		}
-
+		s.opts.handler.Handle(c, rawMsg)
 	}
 }
 

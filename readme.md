@@ -5,7 +5,7 @@
 3. 使用 prometheus 进行监控
 4. metrics 指标
 5. 使用 swagger 进行接口文档管理
-6. 使用 jekins 进行自动化构建,使用k8s进行部署
+6. 使用 jenkins 进行自动化构建,使用k8s进行部署
 
 ## 流程
 
@@ -19,7 +19,7 @@
 
 ### 客户端：
 
-1. 连接接口：`/ws/connect`
+1. 连接接口：`/ws/connect?pid=xxx&uid=xxx&sign=xxx`
    ```
    请求参数
     
@@ -49,6 +49,8 @@
      tags (标签) 可选 多个用逗号分隔
      sign(签名) 必选
      data(数据) 必选
+   
+     设备类型
    ```
    
 

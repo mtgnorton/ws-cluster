@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"github.com/mtgnorton/ws-cluster/config"
+	"github.com/mtgnorton/ws-cluster/logger"
 	"go.uber.org/zap"
 )
 
@@ -18,7 +19,7 @@ func NewOptions(opts ...Option) Options {
 	options := Options{
 		ctx:    context.Background(),
 		config: config.DefaultConfig,
-		logger: zap.NewNop().Sugar(),
+		logger: logger.DefaultLogger,
 	}
 	for _, o := range opts {
 		o(&options)

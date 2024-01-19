@@ -23,7 +23,6 @@ func (c *viperConfig) load() Config {
 
 	pflag.String("server.node", "1", "server node") // 设置一个命令行参数
 	pflag.String("server.port", "8080", "server port")
-
 	pflag.String("env", "prod", "env")
 
 	pflag.Parse()                              // 解析命令行参数
