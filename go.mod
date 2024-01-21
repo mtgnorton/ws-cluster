@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/gogf/gf/v2 v2.5.7
+	github.com/gogf/gf/v2 v2.6.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.1
@@ -14,12 +14,13 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.2.0 // indirect
+	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 //  indirect
+	github.com/getsentry/sentry-go v0.26.0 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/grokify/html-strip-tags-go v0.0.1 // indirect
