@@ -5,18 +5,21 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gfile"
 	"github.com/mtgnorton/ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/tools/wssentry"
 	"github.com/mtgnorton/ws-cluster/ws/message"
 )
 
 type gfServer struct {
 	opts   Options
 	server *ghttp.Server
+	sentry *wssentry.Handler
 }
 
 func New(opts ...Option) Server {
 	return &gfServer{
 		opts:   NewOptions(opts...),
 		server: g.Server("ws"),
+		sentry: wssentry.GfSentry,
 	}
 }
 
@@ -35,8 +38,9 @@ func (s *gfServer) Options() Options {
 }
 
 func (s *gfServer) Run() {
+	s.server.Use(s.sentry.MiddleWare)
 	s.server.BindHandler("/connect", func(r *ghttp.Request) {
-		s.connect(r)
+		s.sentry.RecoverHttp(r, s.connect)
 	})
 	s.server.SetServerRoot(gfile.MainPkgPath())
 	s.opts.shared.Logger.Debugf("ws server run on port:%d", s.opts.port)
@@ -51,6 +55,7 @@ func (s *gfServer) Stop() error {
 func (s *gfServer) connect(r *ghttp.Request) {
 
 	logger := s.opts.shared.Logger
+
 	if !s.auth(r) {
 		return
 	}
@@ -70,11 +75,19 @@ func (s *gfServer) connect(r *ghttp.Request) {
 		logger.Debugf("Websocket pid is empty")
 		r.Exit()
 	}
+
 	c := client.NewClient(uid, pid, socket.Conn)
 	s.opts.manager.Join(c)
 	c.Send(message.NewSuccessRes("connect success", ""))
 	for {
 		_, rawMsg, err := socket.ReadMessage()
+
+		//if hub := wssentry.GetHubFromContext(r); hub != nil {
+		//	hub.WithScope(func(scope *sentry.Scope) {
+		//		scope.SetExtra("gf_sentry_key˚", "11111")
+		//	})
+		//}
+
 		if err != nil {
 			logger.Infof("Websocket ReadMessage err: %v", err)
 			s.opts.manager.Remove(c)
