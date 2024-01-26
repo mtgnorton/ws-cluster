@@ -1,5 +1,7 @@
 package config
 
+import "fmt"
+
 var DefaultConfig = NewViperConfig()
 
 type Config interface {
@@ -22,6 +24,8 @@ type Values struct {
 	Log        Log        `mapstructure:"log"`
 	Redis      Redis      `mapstructure:"redis"`
 	RedisQueue Redis      `mapstructure:"redis_queue"`
+	Sentry     Sentry     `mapstructure:"sentry"`
+	Prometheus Prometheus `mapstructure:"prometheus"`
 }
 
 type WsServer struct {
@@ -48,10 +52,25 @@ type Redis struct {
 	DB       int    `mapstructure:"db"`
 }
 
+type Sentry struct {
+	DSN              string  `mapstructure:"dsn"`
+	TracesSampleRate float64 `mapstructure:"traces_sample_rate"`
+}
+
+type Prometheus struct {
+	Path   string `mapstructure:"path"`
+	Addr   string `mapstructure:"addr"`
+	Enable bool   `mapstructure:"enable"`
+}
+
 func NewViperConfig() Config {
 
 	c := &viperConfig{}
 	c.load()
+	fmt.Println("--------------------")
+	fmt.Printf("configs:%+v \n", c.Values())
+	fmt.Println("--------------------")
+
 	return c
 
 }

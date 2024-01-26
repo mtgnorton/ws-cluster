@@ -27,5 +27,12 @@ redis_queue:
   user: ""
   password: ""
   db: 4
-sentry:
+sentry: # 如果dsn为空，则不启用sentry
+  #dsn: ""
+  dsn: "https://51da076279386f0174c2d3237aeb657e@o4506597786517504.ingest.sentry.io/4506597788614656"
   traces_sample_rate: 1.0
+#通过docker-compose启动， prometheus的web访问地址为 http://localhost:9092，grafana的web访问地址为 http://localhost:3000,user: admin,password: grafana
+prometheus:
+  enable: true
+  path: /metrics
+  addr: :9091

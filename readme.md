@@ -2,10 +2,12 @@
 
 1. ws 集群
 2. 使用 pprof 和golang trace 进行性能分析
+   pprof 假设http服务运行在 8085 端口,访问 http://localhost:8085/debug/pprof/ 可以查看性能分析数据参考文档 https://goframe.org/pages/viewpage.action?pageId=17203722
 3. 使用 prometheus 进行监控
 4. metrics 指标
 5. 使用 swagger 进行接口文档管理
 6. 使用 jenkins 进行自动化构建,使用k8s进行部署
+7. 使用sentry记录错误日志
 
 ## 流程
 
