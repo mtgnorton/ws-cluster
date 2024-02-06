@@ -13,6 +13,7 @@ type viperConfig struct {
 
 func (c *viperConfig) load() Config {
 	viper.SetConfigName("Config")
+
 	viper.AddConfigPath("./conf")
 	viper.AddConfigPath(".")
 	viper.SetConfigType("yaml")
@@ -34,9 +35,29 @@ func (c *viperConfig) load() Config {
 
 	pflag.String("env", "prod", "set env,options:dev,prod,local")
 	pflag.String("node", "100", "set node,usage snowflake node id and sentry")
+	pflag.Int("ws_port", 8084, "set ws server port")
+	pflag.Int("http_port", 8085, "set http server port")
+	pflag.String("router", "", "set router address")
 
-	pflag.Parse()                             // 解析命令行参数
-	err = viper.BindPFlags(pflag.CommandLine) // 把命令行参数绑定到Viper上
+	pflag.Parse() // 解析命令行参数
+
+	err = viper.BindPFlag("env", pflag.Lookup("env"))
+	if err != nil {
+		panic(err)
+	}
+	err = viper.BindPFlag("node", pflag.Lookup("node"))
+	if err != nil {
+		panic(err)
+	}
+	err = viper.BindPFlag("ws_server.port", pflag.Lookup("ws_port"))
+	if err != nil {
+		panic(err)
+	}
+	err = viper.BindPFlag("http_server.port", pflag.Lookup("http_port"))
+	if err != nil {
+		panic(err)
+	}
+	err = viper.BindPFlag("router.addr", pflag.Lookup("router"))
 	if err != nil {
 		panic(err)
 	}

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>聊天页面</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 300px;
+        }
+
+        #message-container {
+            height: 400px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        #send-button {
+            margin-top: 10px;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script>
+        // 获取token的API地址
+        const tokenApiUrl = "http://localhost:8089/token?pid=1&uid=1";
+        // WebSocket服务器地址
+        const wsServerUrl = "ws://localhost:8084/connect";
+
+        // 登录函数
+        function login() {
+            console.log(111);
+
+            $(".modal").css("display", "block");
+            const uid = $("#uid-input").val();
+            const pid = $("#pid-input").val();
+            console.log(uid, pid, 333);
+
+            getToken(uid, pid);
+
+        }
+
+        $(".close").click(function () {
+            $(".modal").css("display", "none");
+        });
+
+        function showDialog() {
+            $(".modal").css("display", "block");
+        }
+
+        // 获取token函数
+        function getToken(uid, pid) {
+            $.ajax({
+                url: tokenApiUrl,
+                method: "get",
+                data: {
+                    uid: uid,
+                    pid: pid
+                },
+                success: function (response) {
+                    console.log(response);
+
+                    $(".login-button").text("uid:" + uid + "已登录");
+                    $.cookie('token', response.token, {expires: 7, path: '/'});
+                    const token = response.token;
+
+                    connectWebSocket(token);
+                },
+                error: function (error) {
+                    console.log("Error:", error);
+                }
+            });
+        }
+
+        // 连接WebSocket
+        function connectWebSocket(token) {
+            const socket = new WebSocket(wsServerUrl + "?token=" + token);
+
+            socket.onopen = function () {
+                console.log("WebSocket连接已打开");
+            };
+
+            socket.onmessage = function (event) {
+                console.log("收到消息:", event.data);
+                // 在页面上显示收到的消息
+                const message = JSON.parse(event.data);
+                displayMessage(message);
+            };
+
+            socket.onclose = function (event) {
+                console.log("WebSocket连接已关闭");
+            };
+
+            socket.onerror = function (error) {
+                console.log("WebSocket连接发生错误:", error);
+            };
+
+            // 发送消息
+            function sendMessage() {
+                const message = {
+                    "code": 1,
+                    "identification": randomString(),
+                    "type": "request",
+                    "payload": {
+                        "from": "1",
+                        "to": "2",
+                        "content": "hello  2"
+                    }
+                }
+
+                socket.send(JSON.stringify(message));
+                $("#message-input").val("");
+            }
+
+            // 在页面上显示消息
+            function displayMessage(message) {
+                const messageElement = $("<div>").text(message.text);
+                $("#message-container").append(messageElement);
+            }
+
+            // 监听发送按钮的点击事件
+            $("#send-button").click(sendMessage);
+        }
+    </script>
+</head>
+<body>
+<div class="container">
+    <h1 class="mt-5 mb-4">聊天页面</h1>
+    <button class="btn btn-primary mb-3 login-button" onclick="showDialog()">登录</button>
+
+    <!-- 登录弹框 -->
+    <div class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="form-group">
+                <label for="uid-input">uid:</label>
+                <input type="text" class="form-control" id="uid-input">
+            </div>
+            <div class="form-group">
+                <label for="pid-input">pid:</label>
+                <input type="pid" class="form-control" id="pid-input">
+            </div>
+            <button class="btn btn-primary" onclick="login()">登录</button>
+        </div>
+    </div>
+
+    <div id="message-container"></div>
+    <div class="input-group mb-3">
+        <input type="text" class="form-control" id="message-input">
+        <div class="input-group-append">
+            <button class="btn btn-primary" id="send-button">发送</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function randomString(){
+        var len = 16;
+        var $chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678';
+        var maxPos = $chars.length;
+        var pwd = '';
+        for (i = 0; i < len; i++) {
+            pwd += $chars.charAt(Math.floor(Math.random() * maxPos));
+        }
+        return pwd;
+    }
+    // 关闭登录弹框
+    $(".close").click(function () {
+        $(".modal").css("display", "none");
+    });
+</script>
+</body>
+</html>

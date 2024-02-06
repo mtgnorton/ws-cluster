@@ -18,6 +18,9 @@ const (
 )
 
 func (s *SentryInstance) Init() error {
+	if s.opts.dsn == "" {
+		return nil
+	}
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn: s.opts.dsn,
 		// Set tracesSampleRate to 1.0 to capture 100%

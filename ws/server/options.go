@@ -2,37 +2,39 @@ package server
 
 import (
 	"context"
+
 	"github.com/mtgnorton/ws-cluster/config"
 	"github.com/mtgnorton/ws-cluster/core/manager"
-	"github.com/mtgnorton/ws-cluster/shared"
+	"github.com/mtgnorton/ws-cluster/logger"
+	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 	"github.com/mtgnorton/ws-cluster/ws/handler"
-	"github.com/mtgnorton/ws-cluster/ws/message"
 )
 
 type Option func(*Options)
 type Options struct {
-	ctx     context.Context
-	config  config.Config
-	shared  *shared.Shared
-	manager manager.Manager
-	parser  message.Parse
-	handler handler.Handle
-	port    int
+	ctx        context.Context
+	config     config.Config
+	manager    manager.Manager
+	handler    handler.Handle
+	logger     logger.Logger
+	prometheus *wsprometheus.Prometheus
+	port       int
 }
 
 func NewOptions(opts ...Option) Options {
 
 	options := Options{
-		ctx:     context.TODO(),
-		config:  config.DefaultConfig,
-		shared:  shared.DefaultShared,
-		manager: manager.DefaultManager,
-		parser:  message.DefaultParser,
-		handler: handler.DefaultHandler,
+		ctx:        context.TODO(),
+		config:     config.DefaultConfig,
+		manager:    manager.DefaultManager,
+		handler:    handler.DefaultHandler,
+		logger:     logger.DefaultLogger,
+		prometheus: wsprometheus.DefaultPrometheus,
 	}
 	for _, o := range opts {
 		o(&options)
 	}
+
 	c := options.config
 	options.port = c.Values().WsServer.Port
 	return options
@@ -48,9 +50,10 @@ func WithConfig(c config.Config) Option {
 		o.config = c
 	}
 }
-func WithShared(s *shared.Shared) Option {
+
+func WithLogger(l logger.Logger) Option {
 	return func(o *Options) {
-		o.shared = s
+		o.logger = l
 	}
 }
 

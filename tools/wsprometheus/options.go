@@ -5,10 +5,6 @@ import (
 
 	"github.com/mtgnorton/ws-cluster/logger"
 
-	"go.uber.org/zap"
-
-	"github.com/mtgnorton/ws-cluster/tools/wsprometheus/metric"
-
 	"github.com/mtgnorton/ws-cluster/config"
 )
 
@@ -19,15 +15,15 @@ type Options struct {
 	// can be stored in a Context
 	Context       context.Context
 	Config        config.Config
-	Logger        *zap.SugaredLogger
-	MetricManager *metric.Manager
+	Logger        logger.Logger
+	MetricManager *Manager
 }
 
 func NewOptions(opts ...Option) Options {
 	options := Options{
 		Context:       context.Background(),
 		Config:        config.DefaultConfig,
-		MetricManager: metric.DefaultManager,
+		MetricManager: DefaultManager,
 		Logger:        logger.DefaultLogger,
 	}
 	for _, o := range opts {
@@ -48,13 +44,13 @@ func WithConfig(c config.Config) Option {
 	}
 }
 
-func WithManager(m *metric.Manager) Option {
+func WithManager(m *Manager) Option {
 	return func(o *Options) {
 		o.MetricManager = m
 	}
 }
 
-func WithLogger(l *zap.SugaredLogger) Option {
+func WithLogger(l logger.Logger) Option {
 	return func(o *Options) {
 		o.Logger = l
 	}

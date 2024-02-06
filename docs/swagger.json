@@ -1,0 +1,95 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "包含ws连接、消息发送、消息接收、消息推送等接口",
+        "title": "Ws-cluster API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "mtgnorton"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "paths": {
+        "/push": {
+            "post": {
+                "description": "业务系统通过该接口推送消息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "业务系统通过该接口推送消息",
+                "operationId": "push-message",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "项目id",
+                        "name": "pid",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "用户id，多个用户id以逗号隔开",
+                        "name": "uids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "客户端id,多个客户端id以逗号隔开",
+                        "name": "cids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "标签,多个标签以逗号隔开",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "签名",
+                        "name": "sign",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "推送的消息内容",
+                        "name": "data",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "code=0,msg=error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mtgnorton_ws-cluster_http_message.Res"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_mtgnorton_ws-cluster_http_message.Res": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "1 成功，0 失败",
+                    "type": "integer"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "payload": {}
+            }
+        }
+    }
+}

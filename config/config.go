@@ -1,6 +1,8 @@
 package config
 
-import "fmt"
+import (
+	"github.com/gogf/gf/v2/frame/g"
+)
 
 var DefaultConfig = NewViperConfig()
 
@@ -19,13 +21,22 @@ const (
 type Values struct {
 	Env        Env        `mapstructure:"env"`
 	Node       int64      `mapstructure:"node"`
+	Router     Router     `mapstructure:"router"`
 	WsServer   WsServer   `mapstructure:"ws_server"`
 	HttpServer HttpServer `mapstructure:"http_server"`
 	Log        Log        `mapstructure:"log"`
 	Redis      Redis      `mapstructure:"redis"`
 	RedisQueue Redis      `mapstructure:"redis_queue"`
+	Jwt        Jwt        `mapstructure:"jwt"`
 	Sentry     Sentry     `mapstructure:"sentry"`
 	Prometheus Prometheus `mapstructure:"prometheus"`
+	Pprof      Pprof      `mapstructure:"pprof"`
+	Swagger    Swagger    `mapstructure:"swagger"`
+}
+
+type Router struct {
+	Addr    string `mapstructure:"addr"`
+	OutHost string `mapstructure:"out_host"`
 }
 
 type WsServer struct {
@@ -52,6 +63,10 @@ type Redis struct {
 	DB       int    `mapstructure:"db"`
 }
 
+type Jwt struct {
+	Secret string `mapstructure:"secret"`
+	Expire int    `mapstructure:"expire"`
+}
 type Sentry struct {
 	DSN              string  `mapstructure:"dsn"`
 	TracesSampleRate float64 `mapstructure:"traces_sample_rate"`
@@ -63,13 +78,23 @@ type Prometheus struct {
 	Enable bool   `mapstructure:"enable"`
 }
 
+type Pprof struct {
+	Enable bool `mapstructure:"enable"`
+	Port   int  `mapstructure:"port"`
+}
+
+type Swagger struct {
+	Enable bool   `mapstructure:"enable"`
+	Path   string `mapstructure:"path"`
+	Port   int    `mapstructure:"port"`
+}
+
 func NewViperConfig() Config {
 
 	c := &viperConfig{}
 	c.load()
-	fmt.Println("--------------------")
-	fmt.Printf("configs:%+v \n", c.Values())
-	fmt.Println("--------------------")
+
+	g.Dump("configs:", c.Values())
 
 	return c
 

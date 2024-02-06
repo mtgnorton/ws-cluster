@@ -2,21 +2,20 @@ package handler
 
 import (
 	"github.com/mtgnorton/ws-cluster/core/manager"
-	"github.com/mtgnorton/ws-cluster/shared"
-	"go.uber.org/zap"
+	"github.com/mtgnorton/ws-cluster/logger"
 )
 
 type Option func(*Options)
 
 type Options struct {
 	manager manager.Manager
-	logger  *zap.SugaredLogger
+	logger  logger.Logger
 }
 
 func NewOptions(opts ...Option) *Options {
 	options := &Options{
 		manager: manager.DefaultManager,
-		logger:  shared.DefaultShared.Logger,
+		logger:  logger.DefaultLogger,
 	}
 	for _, o := range opts {
 		o(options)

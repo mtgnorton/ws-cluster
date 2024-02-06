@@ -1,13 +1,24 @@
 ## 功能
 
 1. ws 集群
-2. 使用 pprof 和golang trace 进行性能分析
-   pprof 假设http服务运行在 8085 端口,访问 http://localhost:8085/debug/pprof/ 可以查看性能分析数据参考文档 https://goframe.org/pages/viewpage.action?pageId=17203722
-3. 使用 prometheus 进行监控
-4. metrics 指标
+2. 使用 pprof 进行性能分析
+   pprof 当启动http服务时，如果设置pprof开启，那么pprof会伴随启动，假设服务运行在 6060
+   端口,访问 http://localhost:6060/debug/pprof/
+   可以查看性能分析数据参考文档 https://goframe.org/pages/viewpage.action?pageId=17203722
+3. 使用 prometheus 进行指标监控
+   常用query
+    - 5分钟内HTTP请求持续时间的50th百分位数 `histogram_quantile(0.5, sum(rate(request_duration_bucket[5m])) by (le))`
+    - 5分钟内HTTP请求持续时间的95th百分位数 `histogram_quantile(0.95, sum(rate(request_duration_bucket[5m])) by (le))`
+    - 5m内请求时间<
+      =0.3秒的请求数量与总请求数量的比率   `sum(rate(request_duration_bucket{le="0.3"}[5m])) by (job) / sum(rate(request_duration_count[5m])) by (job)`
+    - 请求url统计 `request_url_total{job="ws-cluster"}`
+    - 请求总数 `request_total{job="ws-cluster"} `
+    - ws实时连接数 `ws_connection{job="ws-cluster"}`
 5. 使用 swagger 进行接口文档管理
+   swagger 访问路径 http://localhost:9092/swagger/index.html
 6. 使用 jenkins 进行自动化构建,使用k8s进行部署
 7. 使用sentry记录错误日志
+   地址： https://docs.sentry.io/
 
 ## 流程
 
@@ -24,20 +35,21 @@
 1. 连接接口：`/ws/connect?pid=xxx&uid=xxx&sign=xxx`
    ```
    请求参数
-    
     pid(项目 id)
     uid(用户 id)
+    type(连接类型) 1:client 2:server
     sign(签名)
    响应参数
      client_id(客户端 id)
    ```
-2. 订阅流：
-   ```
-   请求参数
-    type: subscribe(订阅) unsubscribe(取消订阅)
-    request_id(请求 id)
-    tag (订阅标签)
-   ```
+2. ws消息：
+   - 客户端：
+     ```
+     请求参数
+      type: subscribe(订阅)
+      tags: 标签
+     ```
+   
 
 ### 业务系统：
 
@@ -47,14 +59,19 @@
    请求参数 
      pid(项目 id) 必选
      uids(用户 id) 可选 多个用逗号分隔
-     client_ids(客户端 id) 可选 多个用逗号分隔
+     cids(客户端 id) 可选 多个用逗号分隔
      tags (标签) 可选 多个用逗号分隔
      sign(签名) 必选
      data(数据) 必选
    
      设备类型
    ```
-   
 
+## 交互类型
+
+1. 连接
+2. 订阅
+3. 请求   
+   c1->router->s1->router->c1
 
 

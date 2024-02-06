@@ -1,11 +1,13 @@
 # et 代表可以通过环境变量和命令参数覆盖的配置项,命令行参数优先级大于环境变量
 env: local #et(WS_ENV,env)  local, dev, prod
 node: 100 #et(WS_NODE,node) 节点编号
-
+router:
+  addr: http://localhost:9696/register #t(router_addr) 路由服务地址
+  out_host: localhost #t(self_addr) 本机对外服务地址,用于注册到路由服务,最后的注册地址为 ws://{self_addr}:{ws_port}/connect
 ws_server:
-  port: 8084
+  port: 8084 #t(ws_port) websocket服务端口
 http_server:
-  port: 8085
+  port: 8085 #t(http_port) http服务端口
 
 log:
   path: /Users/mtgnorton/Coding/go/src/github.com/mtgnorton/ws-cluster/logs
@@ -27,12 +29,23 @@ redis_queue:
   user: ""
   password: ""
   db: 4
+jwt:
+  secret: secret
+  expire: 36000000
 sentry: # 如果dsn为空，则不启用sentry
-  #dsn: ""
-  dsn: "https://51da076279386f0174c2d3237aeb657e@o4506597786517504.ingest.sentry.io/4506597788614656"
+  dsn: ""
+  # dsn: "https://51da076279386f0174c2d3237aeb657e@o4506597786517504.ingest.sentry.io/4506597788614656"
   traces_sample_rate: 1.0
 #通过docker-compose启动， prometheus的web访问地址为 http://localhost:9092，grafana的web访问地址为 http://localhost:3000,user: admin,password: grafana
 prometheus:
-  enable: true
+  enable: false
   path: /metrics
   addr: :9091
+pprof:
+  enable: false
+  port: 6060
+swagger:
+  enable: false
+  path: /swagger
+  port: 9092
+

@@ -4,33 +4,22 @@ import (
 	"github.com/bwmarrin/snowflake"
 	"github.com/go-redis/redis/v8"
 	"github.com/mtgnorton/ws-cluster/config"
-	"github.com/mtgnorton/ws-cluster/logger"
-	"go.uber.org/zap"
+	"github.com/mtgnorton/ws-cluster/shared/jwtws"
 )
 
-var DefaultShared = NewShared(config.DefaultConfig)
+var DefaultRedis *redis.Client = redis.NewClient(&redis.Options{Addr: config.DefaultConfig.Values().Redis.Addr, Password: config.DefaultConfig.Values().Redis.Password, Username: config.DefaultConfig.Values().Redis.User, DB: config.DefaultConfig.Values().Redis.DB})
 
-type Shared struct {
-	Config        config.Config
-	Logger        *zap.SugaredLogger
-	SnowflakeNode *snowflake.Node
-	Redis         *redis.Client
-	QueueRedis    *redis.Client
-}
+var SnowflakeNode *snowflake.Node
+var DefaultJwtWs *jwtws.JwtWs = jwtws.NewJwtWs(config.DefaultConfig)
 
-func NewShared(c config.Config) (s *Shared) {
-	snowflakeNode, err := snowflake.NewNode(c.Values().Node)
+func InitSnowflakeRedisJwt(c config.Config) {
+	var err error
+	SnowflakeNode, err = snowflake.NewNode(c.Values().Node)
 	if err != nil {
 		panic(err)
 	}
-	defer func() {
-		s.Logger.Debugf("configs:%+v", c.Values())
-	}()
-	return &Shared{
-		Config:        c,
-		Logger:        logger.NewZapLogger(c),
-		SnowflakeNode: snowflakeNode,
-		Redis:         redis.NewClient(&redis.Options{Addr: c.Values().Redis.Addr, Password: c.Values().Redis.Password, Username: c.Values().Redis.User, DB: c.Values().Redis.DB}),
-		QueueRedis:    redis.NewClient(&redis.Options{Addr: c.Values().RedisQueue.Addr, Password: c.Values().RedisQueue.Password, Username: c.Values().RedisQueue.User, DB: c.Values().RedisQueue.DB}),
-	}
+
+	DefaultRedis = redis.NewClient(&redis.Options{Addr: c.Values().Redis.Addr, Password: c.Values().Redis.Password, Username: c.Values().Redis.User, DB: c.Values().Redis.DB})
+
+	DefaultJwtWs = jwtws.NewJwtWs(c)
 }
