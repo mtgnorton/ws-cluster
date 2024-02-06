@@ -2,15 +2,16 @@ package manager
 
 import (
 	"context"
-	"github.com/mtgnorton/ws-cluster/config"
+
 	"github.com/mtgnorton/ws-cluster/logger"
-	"go.uber.org/zap"
+
+	"github.com/mtgnorton/ws-cluster/config"
 )
 
 type Options struct {
 	ctx    context.Context
 	config config.Config
-	logger *zap.SugaredLogger
+	logger logger.Logger
 }
 
 type Option func(*Options)
@@ -39,7 +40,7 @@ func WithConfig(c config.Config) Option {
 	}
 }
 
-func WithLogger(l *zap.SugaredLogger) Option {
+func WithLogger(l logger.Logger) Option {
 	return func(o *Options) {
 		o.logger = l
 	}

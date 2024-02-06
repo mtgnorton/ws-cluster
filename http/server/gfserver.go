@@ -1,15 +1,22 @@
 package server
 
 import (
-	"fmt"
-	"math/rand"
+	"context"
+	"encoding/json"
 	"strconv"
 	"time"
+
+	"github.com/mtgnorton/ws-cluster/core/client"
+
+	"github.com/mtgnorton/ws-cluster/shared"
+
+	"github.com/mtgnorton/ws-cluster/message/httpmessage"
+
+	"github.com/mtgnorton/ws-cluster/message/queuemessage"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/mtgnorton/ws-cluster/core/queue"
-	"github.com/mtgnorton/ws-cluster/http/message"
 	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 	"github.com/mtgnorton/ws-cluster/tools/wssentry"
 )
@@ -21,11 +28,13 @@ type gfServer struct {
 }
 
 func New(opts ...Option) Server {
-	return &gfServer{
+	s := &gfServer{
 		opts:   NewOptions(opts...),
 		server: g.Server("http"),
 		sentry: wssentry.GfSentry,
 	}
+
+	return s
 }
 func (g gfServer) Name() string {
 	return "gf"
@@ -42,26 +51,33 @@ func (g gfServer) Options() Options {
 }
 
 func (g gfServer) Run() {
-	fmt.Println(111)
+	g.server.Group("/v1", func(group *ghttp.RouterGroup) {
+		group.Middleware(g.sentry.MiddleWare)
+		group.POST("/push", func(r *ghttp.Request) {
+			ctx := r.Context()
+			beginTime := time.Now()
 
-	g.server.Use(g.sentry.MiddleWare)
-	g.server.BindHandler("/", func(r *ghttp.Request) {
-		beginTime := time.Now()
+			g.sentry.RecoverHttp(r, g.handler)
 
-		g.sentry.RecoverHttp(r, handler)
+			// prometheus add metrics
+			p := g.opts.prometheus
 
-		// prometheus add metrics
-		metricManager := g.opts.prometheus.Options().MetricManager
-		_ = metricManager.Get(wsprometheus.MetricRequestTotal).Inc(nil)
-		_ = metricManager.Get(wsprometheus.MetricRequestURLTotal).Inc([]string{
-			"http",
-			strconv.Itoa(r.Response.Status),
+			err := p.GetAdd(wsprometheus.MetricRequestTotal, nil, 1)
+			if err != nil {
+				g.opts.logger.Infof(ctx, "add metric error:%s", err.Error())
+			}
+			err = p.GetAdd(wsprometheus.MetricRequestURLTotal, []string{"http", strconv.Itoa(r.Response.Status)}, 1)
+			if err != nil {
+				g.opts.logger.Infof(ctx, "add metric error:%s", err.Error())
+			}
+			err = p.GetObserve(wsprometheus.MetricRequestDuration, []string{"http"}, time.Since(beginTime).Seconds())
+			if err != nil {
+				g.opts.logger.Infof(ctx, "add metric error:%s", err.Error())
+			}
 		})
-		_ = metricManager.Get(wsprometheus.MetricRequestDuration).Observe([]string{"http"}, time.Since(beginTime).Seconds())
-
 	})
-	g.opts.shared.Logger.Infof("http server run on port:%d", g.opts.port)
-	g.server.EnablePProf()
+
+	g.opts.logger.Infof(context.Background(), "http server run on port:%d", g.opts.port)
 	g.server.SetPort(g.opts.port)
 	g.server.Run()
 }
@@ -70,19 +86,53 @@ func (g gfServer) Stop() error {
 	return g.server.Shutdown()
 }
 
-func handler(r *ghttp.Request) {
+// 推送消息
+//
+//	@Summary		业务系统通过该接口推送消息
+//	@Description	业务系统通过该接口推送消息
+//	@ID				push-message
+//	@Accept			json
+//	@Produce		json
+//	@Param			pid		query		string		true	"项目id"
+//	@Param			uids	query		string		false	"用户id，多个用户id以逗号隔开"
+//	@Param			cids	query		string		false	"客户端id,多个客户端id以逗号隔开"
+//	@Param			tags	query		string		false	"标签,多个标签以逗号隔开"
+//	@Param			sign	query		string		true	"签名"
+//	@Param			data	query		string		true	"推送的消息内容"
+//	@Success		200		{string}	string		"{"code":1,"msg":"success","payload":{}}"
+//	@Failure		200		{object}	message.Res	"code=0,msg=error"
+//	@Router			/push [post]
+func (g gfServer) handler(r *ghttp.Request) {
 
-	_, err := message.Parse(r.GetBody())
+	claims, err := shared.DefaultJwtWs.Parse(r.Get("token").String())
 	if err != nil {
-		r.Response.WriteJson(message.NewErrorRes("parse message error"))
+		r.Response.WriteJson(httpmessage.NewErrorRes("token is error"))
+		return
+	}
+	if claims.ClientType == int(client.CTypeUser) {
+		r.Response.WriteJson(httpmessage.NewErrorRes("permission denied"))
+		return
+	}
+	msg := httpmessage.Req{}
+	err = json.Unmarshal(r.GetBody(), &msg)
+	if err != nil {
+		r.Response.WriteJson(httpmessage.NewErrorRes("parse message error"))
 		return
 	}
 	// 随机休眠0-10s
-	time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
-	err = queue.DefaultQueue.Publish(r.Context(), queue.TopicDefault, r.GetBody())
+	// time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
+
+	queueMsg := &queuemessage.Message{
+		Type:    queuemessage.TypePush,
+		PID:     claims.PID,
+		Payload: msg.Payload,
+	}
+
+	err = queue.DefaultQueue.Publish(r.Context(), queue.TopicDefault, queueMsg)
 	if err != nil {
-		r.Response.WriteJson(message.NewErrorRes("publish message error"))
+		g.opts.logger.Warnf(r.Context(), "publish message error:%s", err.Error())
+		r.Response.WriteJson(httpmessage.NewErrorRes("publish message error"))
 		return
 	}
-	r.Response.WriteJson(message.NewSuccessRes())
+	r.Response.WriteJson(httpmessage.NewSuccessRes())
 }

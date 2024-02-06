@@ -34,19 +34,18 @@ func newGfSentry(rePanic bool, sentry *SentryInstance, timeout time.Duration) *H
 
 func (h *Handler) MiddleWare(r *ghttp.Request) {
 
-	if h.sentry.opts.dsn == "" {
-		r.Middleware.Next()
-	}
+	if h.sentry.opts.dsn != "" {
+		hub := sentry.GetHubFromContext(r.Context())
+		if hub == nil {
+			hub = sentry.CurrentHub().Clone()
+		}
+		if client := hub.Client(); client != nil {
+			client.SetSDKIdentifier(sdkIdentifier)
+		}
+		hub.Scope().SetRequest(r.Request)
+		r.SetCtxVar(valuesKey, hub)
 
-	hub := sentry.GetHubFromContext(r.Context())
-	if hub == nil {
-		hub = sentry.CurrentHub().Clone()
 	}
-	if client := hub.Client(); client != nil {
-		client.SetSDKIdentifier(sdkIdentifier)
-	}
-	hub.Scope().SetRequest(r.Request)
-	r.SetCtxVar(valuesKey, hub)
 	r.Middleware.Next()
 }
 

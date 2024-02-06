@@ -1,4 +1,4 @@
-package metric
+package wsprometheus
 
 import (
 	"fmt"
@@ -27,18 +27,18 @@ type Metric struct {
 	collector   prometheus.Collector
 }
 
-func (m *Metric) Inc(labelValues []string) (err error) {
-	switch m.Type {
-	case Counter:
-		m.collector.(*prometheus.CounterVec).WithLabelValues(labelValues...).Inc()
-		return
-	case Gauge:
-		m.collector.(*prometheus.GaugeVec).WithLabelValues(labelValues...).Inc()
-		return
-	default:
-		return fmt.Errorf("metric '%s' not Gauge or Counter type", m.Name)
-	}
-}
+//func (m *Metric) Inc(labelValues []string) (err error) {
+//	switch m.Type {
+//	case Counter:
+//		m.collector.(*prometheus.CounterVec).WithLabelValues(labelValues...).Inc()
+//		return
+//	case Gauge:
+//		m.collector.(*prometheus.GaugeVec).WithLabelValues(labelValues...).Inc()
+//		return
+//	default:
+//		return fmt.Errorf("metric '%s' not Gauge or Counter type", m.Name)
+//	}
+//}
 
 func (m *Metric) Add(labelValues []string, value float64) (err error) {
 	switch m.Type {

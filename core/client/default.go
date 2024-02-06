@@ -1,10 +1,16 @@
 package client
 
 import (
+	"context"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"sync"
 	"time"
+
+	"github.com/mtgnorton/ws-cluster/shared"
+	"github.com/sasha-s/go-deadlock"
+
+	"github.com/mtgnorton/ws-cluster/message/wsmessage"
+
+	"github.com/gorilla/websocket"
 )
 
 type defaultClient struct {
@@ -12,94 +18,127 @@ type defaultClient struct {
 	ID              string
 	UID             string
 	PID             string
+	cancel          context.CancelFunc
+	cType           CType           // 用户端还是服务端
 	socket          *websocket.Conn // 连接
 	lastReceiveTime int64
 	messageChan     chan interface{}
-	sync.RWMutex
+	deadlock.RWMutex
 }
 
-func (d *defaultClient) Init(opts ...Option) {
+func (c *defaultClient) Init(opts ...Option) {
 	for _, o := range opts {
-		o(d.opts)
+		o(c.opts)
 	}
 }
 
-func (d *defaultClient) Options() Options {
-	return *d.opts
+func (c *defaultClient) Options() Options {
+	return *c.opts
 }
 
-func (d *defaultClient) Send(message interface{}) {
-	if d.messageChan == nil {
+func (c *defaultClient) Read(ctx context.Context) (msg *wsmessage.Req, isTerminate bool, err error) {
+	_, msgBytes, err := c.socket.ReadMessage()
+	if err != nil {
+		return nil, true, err
+	}
+	msg, err = c.opts.messageProcessor.Decode(msgBytes)
+	return
+}
+
+func (c *defaultClient) Send(ctx context.Context, message *wsmessage.Res) {
+	defer func() {
+		if err := recover(); err != nil {
+			c.opts.logger.Debugf(ctx, "send message recover err:%v", err)
+		}
+	}()
+	c.RLock()
+	defer c.RUnlock()
+
+	if c.messageChan == nil {
 		return
 	}
-	d.messageChan <- message
+	c.messageChan <- message
+	c.opts.logger.Debugf(ctx, "send message:%v finish", message)
 }
 
-func (d *defaultClient) Close() {
-	d.Lock()
-	defer d.Unlock()
-	if d.messageChan == nil {
-		return
-	}
-	close(d.messageChan)
-	d.messageChan = nil
+func (c *defaultClient) Close() {
+	c.Lock()
+	defer c.Unlock()
+	close(c.messageChan)
+	c.cancel()
+	c.messageChan = nil
+	c.opts.logger.Debugf(context.Background(), "client close:%s", c.ID)
 }
 
-func (d *defaultClient) Status() Status {
-	d.RLock()
-	defer d.RUnlock()
-	if d.messageChan == nil {
+func (c *defaultClient) Status() Status {
+	c.RLock()
+	defer c.RUnlock()
+	if c.messageChan == nil {
 		return StatusClosed
 	}
 	return StatusNormal
 }
 
-func (d *defaultClient) UpdateReplyTime() {
-	d.Lock()
-	defer d.Unlock()
-	d.lastReceiveTime = time.Now().Unix()
+func (c *defaultClient) UpdateReplyTime() {
+	c.Lock()
+	defer c.Unlock()
+	c.lastReceiveTime = time.Now().Unix()
 }
 
-func (d *defaultClient) GetReplyTime() int64 {
-	d.RLock()
-	defer d.RUnlock()
-	return d.lastReceiveTime
+func (c *defaultClient) GetReplyTime() int64 {
+	c.RLock()
+	defer c.RUnlock()
+	return c.lastReceiveTime
 }
 
-func (d *defaultClient) GetIDs() (id string, uid string, pid string) {
-	d.RLock()
-	defer d.RUnlock()
-	return d.ID, d.UID, d.PID
+func (c *defaultClient) GetIDs() (id string, uid string, pid string) {
+	c.RLock()
+	defer c.RUnlock()
+	return c.ID, c.UID, c.PID
 }
 
-func (d *defaultClient) String() string {
-	return fmt.Sprintf("Client[ID:%s,UID:%s,PID:%s]", d.ID, d.UID, d.PID)
+func (c *defaultClient) Type() CType {
+	c.RLock()
+	defer c.RUnlock()
+	return c.cType
 }
 
-func (d *defaultClient) sendLoop() {
+func (c *defaultClient) String() string {
+	return fmt.Sprintf("Client[ID:%s,UID:%s,PID:%s,Type:%s]", c.ID, c.UID, c.PID, c.cType)
+}
+
+func (c *defaultClient) sendLoop(ctx context.Context) {
+
 	for {
 		select {
-		case message, ok := <-d.messageChan:
-			if !ok {
-				return
-			}
-			if err := d.socket.WriteJSON(message); err != nil {
+		case <-ctx.Done():
+			c.opts.logger.Debugf(ctx, "send loop done")
+			return
+		case message := <-c.messageChan:
+			if err := c.socket.WriteJSON(message); err != nil {
+				c.opts.logger.Debugf(ctx, "send message error:%v", err)
 				return
 			}
 		}
 	}
 }
 
-func NewClient(uid string, pid string, socket *websocket.Conn, options ...Option) Client {
+func NewClient(ctx context.Context, uid string, pid string, cType CType, socket *websocket.Conn, options ...Option) Client {
+	ctx, cancel := context.WithCancel(ctx)
+	options = append(options, WithContext(ctx))
+
 	opts := NewOptions(options...)
 	c := &defaultClient{
 		opts:        opts,
-		ID:          opts.SnowflakeNode.Generate().String(),
+		ID:          shared.SnowflakeNode.Generate().String(),
 		UID:         uid,
 		PID:         pid,
+		cancel:      cancel,
+		cType:       cType,
 		socket:      socket,
 		messageChan: make(chan interface{}),
 	}
-	go c.sendLoop()
+
+	go c.sendLoop(ctx)
 	return c
 }

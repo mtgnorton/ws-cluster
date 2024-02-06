@@ -1,8 +1,10 @@
 package client
 
 import (
-	"github.com/bwmarrin/snowflake"
-	"github.com/mtgnorton/ws-cluster/shared"
+	"context"
+
+	"github.com/mtgnorton/ws-cluster/logger"
+	"github.com/mtgnorton/ws-cluster/message/wsmessage"
 )
 
 type Device string
@@ -24,12 +26,16 @@ type DeviceInfo struct {
 type Option func(o *Options)
 
 type Options struct {
-	SnowflakeNode *snowflake.Node
+	ctx              context.Context
+	messageProcessor wsmessage.Processor
+	logger           logger.Logger
 }
 
 func NewOptions(opts ...Option) *Options {
 	options := &Options{
-		SnowflakeNode: shared.DefaultShared.SnowflakeNode,
+		ctx:              context.Background(),
+		messageProcessor: wsmessage.DefaultProcessor,
+		logger:           logger.DefaultLogger,
 	}
 	for _, o := range opts {
 		o(options)
@@ -37,8 +43,20 @@ func NewOptions(opts ...Option) *Options {
 	return options
 }
 
-func WithSnowflakeNode(s *snowflake.Node) Option {
+func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
-		o.SnowflakeNode = s
+		o.ctx = ctx
+	}
+}
+
+func WithMessageProcessor(p wsmessage.Processor) Option {
+	return func(o *Options) {
+		o.messageProcessor = p
+	}
+}
+
+func WithLogger(l logger.Logger) Option {
+	return func(o *Options) {
+		o.logger = l
 	}
 }

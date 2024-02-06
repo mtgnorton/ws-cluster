@@ -1,0 +1,64 @@
+definitions:
+  github_com_mtgnorton_ws-cluster_http_message.Res:
+    properties:
+      code:
+        description: 1 成功，0 失败
+        type: integer
+      msg:
+        type: string
+      payload: {}
+    type: object
+info:
+  contact:
+    name: mtgnorton
+  description: 包含ws连接、消息发送、消息接收、消息推送等接口
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Ws-cluster API
+  version: "1.0"
+paths:
+  /push:
+    post:
+      consumes:
+      - application/json
+      description: 业务系统通过该接口推送消息
+      operationId: push-message
+      parameters:
+      - description: 项目id
+        in: query
+        name: pid
+        required: true
+        type: string
+      - description: 用户id，多个用户id以逗号隔开
+        in: query
+        name: uids
+        type: string
+      - description: 客户端id,多个客户端id以逗号隔开
+        in: query
+        name: cids
+        type: string
+      - description: 标签,多个标签以逗号隔开
+        in: query
+        name: tags
+        type: string
+      - description: 签名
+        in: query
+        name: sign
+        required: true
+        type: string
+      - description: 推送的消息内容
+        in: query
+        name: data
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: code=0,msg=error
+          schema:
+            $ref: '#/definitions/github_com_mtgnorton_ws-cluster_http_message.Res'
+      summary: 业务系统通过该接口推送消息
+swagger: "2.0"
