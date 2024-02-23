@@ -16,7 +16,6 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
-	"github.com/mtgnorton/ws-cluster/core/queue"
 	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 	"github.com/mtgnorton/ws-cluster/tools/wssentry"
 )
@@ -128,7 +127,7 @@ func (g gfServer) handler(r *ghttp.Request) {
 		Payload: msg.Payload,
 	}
 
-	err = queue.DefaultQueue.Publish(r.Context(), queue.TopicDefault, queueMsg)
+	err = g.opts.queue.Publish(r.Context(), queueMsg)
 	if err != nil {
 		g.opts.logger.Warnf(r.Context(), "publish message error:%s", err.Error())
 		r.Response.WriteJson(httpmessage.NewErrorRes("publish message error"))

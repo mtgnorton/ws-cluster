@@ -6,45 +6,51 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgnorton/ws-cluster/core/queue/option"
 	"github.com/mtgnorton/ws-cluster/message/queuemessage"
 
 	"github.com/go-redis/redis/v8"
 )
 
 type RedisQueue struct {
-	opts         Options
+	opts         option.Options
+	redisClient  *redis.Client
 	groupName    string
 	consumerName string
 }
 
-func NewRedisQueue(opts ...Option) (q Queue) {
+func NewRedisQueue(opts ...option.Option) (q Queue) {
 
 	defer func() {
 		go func() {
-			_ = q.Consume(q.Options().ctx, TopicDefault)
-
+			_ = q.Consume(q.Options().Ctx, nil)
 		}()
 	}()
-	options := NewOptions(opts...)
+	options := option.NewOptions(opts...)
+
+	c := options.Config
+	redisClient := redis.NewClient(&redis.Options{Addr: c.Values().RedisQueue.Addr, Password: c.Values().RedisQueue.Password, Username: c.Values().RedisQueue.User, DB: c.Values().RedisQueue.DB})
 
 	return &RedisQueue{
 		opts:         options,
-		groupName:    "group-" + fmt.Sprint(options.config.Values().Node),
-		consumerName: "consumer-" + fmt.Sprint(options.config.Values().Node),
+		redisClient:  redisClient,
+		groupName:    "group-" + fmt.Sprint(options.Config.Values().Node),
+		consumerName: "consumer-" + fmt.Sprint(options.Config.Values().Node),
 	}
 }
 
-func (q *RedisQueue) Options() Options {
+func (q *RedisQueue) Options() option.Options {
 	return q.opts
 }
-func (q *RedisQueue) Publish(ctx context.Context, topic Topic, message *queuemessage.Message) error {
-	messageBytes, err := q.opts.messageProcessor.Encode(message)
+func (q *RedisQueue) Publish(ctx context.Context, message *queuemessage.Message) error {
+	messageBytes, err := q.opts.MessageProcessor.Encode(message)
 	if err != nil {
 		return err
 	}
-	q.opts.logger.Debugf(ctx, "publish topic:%s,message:%s", topic, messageBytes)
+	topic := q.opts.Topic
+	q.opts.Logger.Debugf(ctx, "publish topic:%s,message:%s", topic, messageBytes)
 
-	return q.opts.queueRedis.XAdd(ctx, &redis.XAddArgs{
+	return q.redisClient.XAdd(ctx, &redis.XAddArgs{
 		Stream: string(topic),
 		Values: map[string]interface{}{
 			"m": string(messageBytes),
@@ -52,9 +58,11 @@ func (q *RedisQueue) Publish(ctx context.Context, topic Topic, message *queuemes
 	}).Err()
 }
 
-func (q *RedisQueue) Consume(ctx context.Context, topic Topic) (err error) {
-	queueRedis := q.opts.queueRedis
-	logger := q.opts.logger
+// Consume 开启一个协程，不断地从redis中读取消息
+func (q *RedisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
+	queueRedis := q.redisClient
+	logger := q.opts.Logger
+	topic := q.opts.Topic
 	r1, err := queueRedis.XGroupCreateMkStream(ctx, string(topic), q.groupName, "$").Result()
 	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
 		logger.Warnf(ctx, "consume failed to create group:%s,err:%v", q.groupName, err)
@@ -82,7 +90,7 @@ func (q *RedisQueue) Consume(ctx context.Context, topic Topic) (err error) {
 		}).Result()
 
 		if err == redis.Nil {
-			// logger.Debugf(ctx, "consume no message")
+			// Logger.Debugf(Ctx, "consume no message")
 			continue
 		}
 		//if err != nil && strings.Contains(err.Error(), "i/o timeout") {
@@ -96,23 +104,20 @@ func (q *RedisQueue) Consume(ctx context.Context, topic Topic) (err error) {
 		for _, message := range streams[0].Messages {
 			logger.Debugf(ctx, "consume topic:%s,message id:%s,values:%s", topic, message.ID, message.Values)
 
-			// 可能的情况
-			// 1. 该消息不属于该服务端，此时isAck为false，不需要ack
-			// 2. 该消息属于该服务端，但是处理失败，此时isAck为false，不需要ack
 			concreteMsgString := message.Values["m"].(string)
-			concreteMsg, err := q.opts.messageProcessor.Decode([]byte(concreteMsgString))
+			concreteMsg, err := q.opts.MessageProcessor.Decode([]byte(concreteMsgString))
 			if err != nil {
 				logger.Warnf(ctx, "consume failed to decode message: %s,err:%v", concreteMsgString, err)
 				continue
 			}
-			if isAck := q.opts.handlers[concreteMsg.Type].Handle(ctx, *concreteMsg); isAck {
+			if isAck := q.opts.Handlers[concreteMsg.Type].Handle(ctx, *concreteMsg); isAck {
 				_, err := queueRedis.XAck(ctx, string(topic), q.groupName, message.ID).Result()
 				if err != nil {
 					logger.Warnf(ctx, "consume failed to ack message: %s,err:%v", message.Values["m"].(string), err)
 					continue
 				}
 			} else {
-				logger.Warnf(ctx, "consume failed to handle message: %s", message.Values["m"].(string))
+				logger.Warnf(ctx, "consume message: %s,not ack", message.Values["m"].(string))
 			}
 		}
 	}
