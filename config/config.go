@@ -27,6 +27,7 @@ type Values struct {
 	Log        Log        `mapstructure:"log"`
 	Redis      Redis      `mapstructure:"redis"`
 	RedisQueue Redis      `mapstructure:"redis_queue"`
+	Kafka      Kafka      `mapstructure:"kafka"`
 	Jwt        Jwt        `mapstructure:"jwt"`
 	Sentry     Sentry     `mapstructure:"sentry"`
 	Prometheus Prometheus `mapstructure:"prometheus"`
@@ -61,6 +62,11 @@ type Redis struct {
 	User     string `mapstructure:"user"`
 	Password string `mapstructure:"password"`
 	DB       int    `mapstructure:"db"`
+}
+
+type Kafka struct {
+	Broker  string `mapstructure:"broker"`
+	Version string `mapstructure:"version"`
 }
 
 type Jwt struct {

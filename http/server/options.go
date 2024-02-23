@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 
+	"github.com/mtgnorton/ws-cluster/core/queue"
 	"github.com/mtgnorton/ws-cluster/logger"
 
 	"github.com/mtgnorton/ws-cluster/config"
@@ -16,6 +17,7 @@ type Options struct {
 	config     config.Config
 	logger     logger.Logger
 	prometheus *wsprometheus.Prometheus
+	queue      queue.Queue
 	port       int
 }
 
@@ -25,6 +27,7 @@ func NewOptions(opts ...Option) Options {
 		config:     config.DefaultConfig,
 		logger:     logger.DefaultLogger,
 		prometheus: wsprometheus.DefaultPrometheus,
+		queue:      queue.DefaultQueue,
 		port:       config.DefaultConfig.Values().HttpServer.Port,
 	}
 	for _, o := range opts {
@@ -53,6 +56,12 @@ func WithLogger(l logger.Logger) Option {
 func WithPrometheus(p *wsprometheus.Prometheus) Option {
 	return func(o *Options) {
 		o.prometheus = p
+	}
+}
+
+func WithQueue(q queue.Queue) Option {
+	return func(o *Options) {
+		o.queue = q
 	}
 }
 

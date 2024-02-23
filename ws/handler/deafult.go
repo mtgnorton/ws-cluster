@@ -8,8 +8,6 @@ import (
 
 	"github.com/mtgnorton/ws-cluster/message/queuemessage"
 
-	"github.com/mtgnorton/ws-cluster/core/queue"
-
 	"github.com/mtgnorton/ws-cluster/core/client"
 )
 
@@ -91,7 +89,7 @@ func (w *WsHandler) subscribe(ctx context.Context, c client.Client, msg *wsmessa
 		Identification: msg.Identification,
 		Payload:        payload,
 	}
-	err = w.opts.queue.Publish(ctx, queue.TopicDefault, queueMsg)
+	err = w.opts.queue.Publish(ctx, queueMsg)
 	if err != nil {
 		c.Send(ctx, wsmessage.NewErrorRes("publish error", ""))
 		w.opts.logger.Infof(ctx, "WsHandler-unsubscribe publish error %v", err)
@@ -120,7 +118,7 @@ func (w *WsHandler) unsubscribe(ctx context.Context, c client.Client, msg *wsmes
 		Identification: msg.Identification,
 		Payload:        payload,
 	}
-	err = w.opts.queue.Publish(ctx, queue.TopicDefault, queueMsg)
+	err = w.opts.queue.Publish(ctx, queueMsg)
 	if err != nil {
 		c.Send(ctx, wsmessage.NewErrorRes("publish error", ""))
 		w.opts.logger.Infof(ctx, "WsHandler-unsubscribe publish error %v", err)
@@ -138,7 +136,7 @@ func (w *WsHandler) Push(ctx context.Context, c client.Client, msg *wsmessage.Re
 		Payload:        msg.Payload,
 	}
 
-	err := w.opts.queue.Publish(ctx, queue.TopicDefault, queueMsg)
+	err := w.opts.queue.Publish(ctx, queueMsg)
 	if err != nil {
 		w.opts.logger.Infof(ctx, "WsHandler-push publish error %v", err)
 		return
@@ -158,7 +156,7 @@ func (w *WsHandler) Request(ctx context.Context, c client.Client, msg *wsmessage
 		Payload:        msg.Payload,
 	}
 
-	err := w.opts.queue.Publish(ctx, queue.TopicDefault, queueMsg)
+	err := w.opts.queue.Publish(ctx, queueMsg)
 	if err != nil {
 		w.opts.logger.Infof(ctx, "WsHandler-request publish error %v", err)
 		return
@@ -174,7 +172,7 @@ func (w *WsHandler) Connect(ctx context.Context, c client.Client, msg *wsmessage
 		PID:     Pid,
 		Payload: &queuemessage.PayloadConnect{UID: uid, CID: id},
 	}
-	err := w.opts.queue.Publish(ctx, queue.TopicDefault, queueMsg)
+	err := w.opts.queue.Publish(ctx, queueMsg)
 	if err != nil {
 		w.opts.logger.Infof(ctx, "WsHandler-request publish error %v", err)
 		return
@@ -189,7 +187,7 @@ func (w *WsHandler) Disconnect(ctx context.Context, c client.Client, msg *wsmess
 		PID:     Pid,
 		Payload: &queuemessage.PayloadConnect{UID: uid, CID: id},
 	}
-	err := w.opts.queue.Publish(ctx, queue.TopicDefault, queueMsg)
+	err := w.opts.queue.Publish(ctx, queueMsg)
 	if err != nil {
 		w.opts.logger.Infof(ctx, "WsHandler-request publish error %v", err)
 		return
