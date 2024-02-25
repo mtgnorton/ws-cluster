@@ -20,6 +20,9 @@
 7. 使用sentry记录错误日志
    地址： https://docs.sentry.io/
 
+## 使用
+./ws-cluster --node 200 --ws_port 8812 --http_port 8912 --queue redis 
+
 ## 流程
 
 1. 客户端向服务端请求建立长连接，通过 nginx或k8s负载均衡器，将请求转发到任意一个服务端

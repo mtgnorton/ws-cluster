@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/mtgnorton/ws-cluster/config"
 	"github.com/mtgnorton/ws-cluster/core/manager"
 	"github.com/mtgnorton/ws-cluster/core/queue"
 	"github.com/mtgnorton/ws-cluster/logger"
@@ -21,7 +22,7 @@ func NewOptions(opts ...Option) *Options {
 		manager:   manager.DefaultManager,
 		logger:    logger.DefaultLogger,
 		processor: wsmessage.DefaultProcessor,
-		queue:     queue.DefaultQueue,
+		queue:     queue.GetQueueInstance(config.DefaultConfig),
 	}
 	for _, o := range opts {
 		o(options)

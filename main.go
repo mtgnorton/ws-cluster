@@ -40,6 +40,7 @@ func main() {
 	defer sentry.Flush(time.Second * 3)
 
 	go server2.DefaultHttpServer.Run()
+
 	server.DefaultWsServer.Run()
 }
 

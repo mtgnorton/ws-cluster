@@ -23,13 +23,8 @@ func (c *viperConfig) load() Config {
 
 	//viper.AutomaticEnv() // Viper从环境变量中读取配置
 
-	err := viper.BindEnv("env")
+	err := viper.BindEnv("env", "node")
 	if err != nil {
-		panic(err)
-	}
-
-	err = viper.BindEnv("node")
-	if err != err {
 		panic(err)
 	}
 
@@ -38,6 +33,7 @@ func (c *viperConfig) load() Config {
 	pflag.Int("ws_port", 8084, "set ws server port")
 	pflag.Int("http_port", 8085, "set http server port")
 	pflag.String("router", "", "set router address")
+	pflag.String("queue", "redis", "set queue type, options:redis,kafka")
 
 	pflag.Parse() // 解析命令行参数
 
@@ -58,6 +54,11 @@ func (c *viperConfig) load() Config {
 		panic(err)
 	}
 	err = viper.BindPFlag("router.addr", pflag.Lookup("router"))
+	if err != nil {
+		panic(err)
+	}
+
+	err = viper.BindPFlag("queue.use", pflag.Lookup("queue"))
 	if err != nil {
 		panic(err)
 	}

@@ -57,6 +57,12 @@ func WithLogger(l logger.Logger) Option {
 	}
 }
 
+func WithHandler(h handler.Handle) Option {
+	return func(o *Options) {
+		o.handler = h
+	}
+}
+
 func WithManager(m manager.Manager) Option {
 	return func(o *Options) {
 		o.manager = m

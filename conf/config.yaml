@@ -8,7 +8,17 @@ ws_server:
   port: 8084 #t(ws_port) websocket服务端口
 http_server:
   port: 8085 #t(http_port) http服务端口
-queue: redis #et(WS_QUEUE,queue) 队列类型 redis, kafka
+queue:
+  use: redis #t(queue) 队列类型 redis, kafka
+  redis:
+    addr: localhost:6379
+    port:
+    user: ""
+    password: ""
+    db: 4
+  kafka:
+    broker: localhost:7093
+    version: 3.2.0
 log:
   path: /Users/mtgnorton/Coding/go/src/github.com/mtgnorton/ws-cluster/logs
   print: true # 是否打印日志
@@ -23,15 +33,7 @@ redis:
   user: ""
   password: ""
   db: 3
-redis_queue:
-  addr: localhost:6379
-  port:
-  user: ""
-  password: ""
-  db: 4
-kafka:
-  broker: localhost:7093
-  version: 3.2.0
+
 jwt:
   secret: secret
   expire: 36000000

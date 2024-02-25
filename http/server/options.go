@@ -27,7 +27,7 @@ func NewOptions(opts ...Option) Options {
 		config:     config.DefaultConfig,
 		logger:     logger.DefaultLogger,
 		prometheus: wsprometheus.DefaultPrometheus,
-		queue:      queue.DefaultQueue,
+		queue:      queue.GetQueueInstance(config.DefaultConfig),
 		port:       config.DefaultConfig.Values().HttpServer.Port,
 	}
 	for _, o := range opts {
