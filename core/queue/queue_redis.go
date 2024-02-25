@@ -29,7 +29,7 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 	options := option.NewOptions(opts...)
 
 	c := options.Config
-	redisClient := redis.NewClient(&redis.Options{Addr: c.Values().RedisQueue.Addr, Password: c.Values().RedisQueue.Password, Username: c.Values().RedisQueue.User, DB: c.Values().RedisQueue.DB})
+	redisClient := redis.NewClient(&redis.Options{Addr: c.Values().Queue.Redis.Addr, Password: c.Values().Queue.Redis.Password, Username: c.Values().Queue.Redis.User, DB: c.Values().Queue.Redis.DB})
 
 	return &RedisQueue{
 		opts:         options,

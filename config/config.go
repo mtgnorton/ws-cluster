@@ -24,9 +24,9 @@ type Values struct {
 	Router     Router     `mapstructure:"router"`
 	WsServer   WsServer   `mapstructure:"ws_server"`
 	HttpServer HttpServer `mapstructure:"http_server"`
+	Queue      Queue      `mapstructure:"queue"`
 	Log        Log        `mapstructure:"log"`
 	Redis      Redis      `mapstructure:"redis"`
-	RedisQueue Redis      `mapstructure:"redis_queue"`
 	Kafka      Kafka      `mapstructure:"kafka"`
 	Jwt        Jwt        `mapstructure:"jwt"`
 	Sentry     Sentry     `mapstructure:"sentry"`
@@ -47,6 +47,12 @@ type WsServer struct {
 type HttpServer struct {
 	Port int `mapstructure:"port"`
 }
+type Queue struct {
+	Use   string `mapstructure:"use"`
+	Redis Redis  `mapstructure:"redis"`
+	Kafka Kafka  `mapstructure:"kafka"`
+}
+
 type Log struct {
 	Path       string `mapstructure:"path"`
 	Print      bool   `mapstructure:"print"`

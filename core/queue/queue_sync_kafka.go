@@ -22,7 +22,7 @@ type KafkaSyncQueue struct {
 func NewKafkaQueue(opts ...option.Option) (q Queue) {
 	options := option.NewOptions(opts...)
 
-	producer, err := kafka.NewProducer(options.Config.Values().Kafka.Broker)
+	producer, err := kafka.NewProducer(options.Config.Values().Queue.Kafka.Broker)
 	if err != nil {
 		panic(err)
 	}

@@ -2,13 +2,16 @@ package queue
 
 import (
 	"context"
+	"sync"
+
+	"github.com/mtgnorton/ws-cluster/config"
 
 	"github.com/mtgnorton/ws-cluster/core/queue/option"
 
 	"github.com/mtgnorton/ws-cluster/message/queuemessage"
 )
 
-var DefaultQueue = NewKafkaQueue()
+var QueueInstance Queue
 
 // Queue 队列接口
 // 使用发布订阅模式
@@ -28,3 +31,24 @@ type Topic string
 const (
 	TopicDefault = "default"
 )
+
+type QueueType string
+
+const (
+	QueueTypeRedis = "redis"
+
+	QueueTypeKafka = "kafka"
+)
+
+var once sync.Once
+
+func GetQueueInstance(c config.Config) Queue {
+	once.Do(func() {
+		if c.Values().Queue.Use == QueueTypeKafka {
+			QueueInstance = NewKafkaQueue(option.WithConfig(c))
+		} else {
+			QueueInstance = NewRedisQueue(option.WithConfig(c))
+		}
+	})
+	return QueueInstance
+}
