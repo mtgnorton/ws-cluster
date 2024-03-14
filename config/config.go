@@ -36,6 +36,7 @@ type Values struct {
 }
 
 type Router struct {
+	Enable  bool   `mapstructure:"enable"`
 	Addr    string `mapstructure:"addr"`
 	OutHost string `mapstructure:"out_host"`
 }

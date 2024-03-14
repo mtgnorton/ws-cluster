@@ -9,10 +9,8 @@ import (
 var ErrReadMessage = errors.New("read message error")
 
 const (
-	TypeSubscribe   = queuemessage.TypeSubscribe
-	TypeUnsubscribe = queuemessage.TypeUnsubscribe
-	TypeRequest     = queuemessage.TypeRequest
-	TypePush        = queuemessage.TypePush
+	TypeRequest = queuemessage.TypeRequest
+	TypePush    = queuemessage.TypePush
 
 	TypeConnect    = queuemessage.TypeConnect
 	TypeDisconnect = queuemessage.TypeDisconnect

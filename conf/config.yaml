@@ -2,6 +2,7 @@
 env: local #et(WS_ENV,env)  local, dev, prod
 node: 100 #et(WS_NODE,node) 节点编号
 router:
+  enable: false # 如果为true，会想路由服务地址发起注册请求
   addr: http://localhost:9696/register #t(router_addr) 路由服务地址
   out_host: localhost #t(self_addr) 本机对外服务地址,用于注册到路由服务,最后的注册地址为 ws://{self_addr}:{ws_port}/connect
 ws_server:

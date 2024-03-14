@@ -11,7 +11,7 @@ import (
 // pid 1 uid 99999 server  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaWQiOiIxIiwidWlkIjoiOTk5OTkiLCJjbGllbnRfdHlwZSI6MSwiZXhwIjoyMTc5NzQ0NTM0LCJpc3MiOiJ3cy1jbHVzdGVyIn0.lDVixBSnT9nK7gsVvHsUtDk8qXA9BdwhX7Y2bqrrvtg
 func Test_Jwt(t *testing.T) {
 	defaultJwtWs := NewJwtWs(config.DefaultConfig)
-	token, err := defaultJwtWs.Generate("1", "99999", 1)
+	token, err := defaultJwtWs.Generate("1", "1", 0)
 	if err != nil {
 		t.Error(err)
 	}

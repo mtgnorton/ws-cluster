@@ -4,19 +4,29 @@ import (
 	"encoding/json"
 )
 
-type JsonProcessor struct{}
+type WsMsgJsonProcessor struct{}
 
-func (j JsonProcessor) Decode(msg []byte) (message *Req, err error) {
+func (j WsMsgJsonProcessor) ReqEncode(message *Req) (messageBytes []byte, err error) {
+	messageBytes, err = json.Marshal(message)
+	return
+}
+func (j WsMsgJsonProcessor) ReqDecode(msg []byte) (message *Req, err error) {
 	message = &Req{}
 	err = json.Unmarshal(msg, message)
 	return
 }
 
-func (j JsonProcessor) Encode(message *Res) (msg []byte, err error) {
-	//TODO implement me
-	panic("implement me")
+func (j WsMsgJsonProcessor) ResDecode(messageBytes []byte) (message *Res, err error) {
+	message = &Res{}
+	err = json.Unmarshal(messageBytes, message)
+	return
 }
 
-func NewJsonProcessor() *JsonProcessor {
-	return &JsonProcessor{}
+func (j WsMsgJsonProcessor) ResEncode(message *Res) (messageBytes []byte, err error) {
+	messageBytes, err = json.Marshal(message)
+	return
+}
+
+func NewJsonProcessor() *WsMsgJsonProcessor {
+	return &WsMsgJsonProcessor{}
 }

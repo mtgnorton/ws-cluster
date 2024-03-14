@@ -4,19 +4,19 @@ import (
 	"encoding/json"
 )
 
-type JsonProcessor struct{}
+type QueueMSgJsonProcessor struct{}
 
-func (j JsonProcessor) Decode(messageBytes []byte) (message *Message, err error) {
+func (j QueueMSgJsonProcessor) Decode(messageBytes []byte) (message *Message, err error) {
 	message = &Message{}
 	err = json.Unmarshal(messageBytes, message)
 	return
 }
 
-func (j JsonProcessor) Encode(message *Message) (messageBytes []byte, err error) {
+func (j QueueMSgJsonProcessor) Encode(message *Message) (messageBytes []byte, err error) {
 	messageBytes, err = json.Marshal(message)
 	return
 }
 
-func NewJsonProcessor() *JsonProcessor {
-	return &JsonProcessor{}
+func NewJsonProcessor() *QueueMSgJsonProcessor {
+	return &QueueMSgJsonProcessor{}
 }

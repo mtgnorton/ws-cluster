@@ -5,12 +5,10 @@ import "encoding/json"
 type Type string
 
 const (
-	TypeSubscribe   Type = "subscribe"
-	TypeUnsubscribe Type = "unsubscribe"
-	TypePush        Type = "push"
-	TypeRequest     Type = "request"
-	TypeConnect     Type = "connect"
-	TypeDisconnect  Type = "disconnect"
+	TypePush       Type = "push"
+	TypeRequest    Type = "request"
+	TypeConnect    Type = "connect"
+	TypeDisconnect Type = "disconnect"
 )
 
 type Message struct {
@@ -21,42 +19,31 @@ type Message struct {
 	Payload        interface{} `json:"payload"` // 必填，根据不同的type，body的内容不同，由具体的handler解析
 }
 
-type PayloadSubscribe struct {
-	Tags string `json:"tags"` // 多个tag用逗号分隔
-}
-
-func ParseSubscribe(payloadInterface interface{}) (payload *PayloadSubscribe, err error) {
-	payload = &PayloadSubscribe{}
-	payloadBytes, err := json.Marshal(payloadInterface)
-	if err != nil {
-		return
-	}
-	err = json.Unmarshal(payloadBytes, payload)
-	return
-}
-
-type PayloadUnsubscribe = PayloadSubscribe
-
-func ParseUnsubscribe(payloadInterface interface{}) (payload *PayloadUnsubscribe, err error) {
-	payload = &PayloadUnsubscribe{}
-	payloadBytes, err := json.Marshal(payloadInterface)
-	if err != nil {
-		return
-	}
-	err = json.Unmarshal(payloadBytes, payload)
-	return
-}
-
 type PayLoadPush struct {
-	PID  string      `json:"pid"`
-	UIDs string      `json:"uids"`
-	CIDs string      `json:"cids"`
-	Tags string      `json:"tags"`
+	PID  string      `json:"pid"`  // 项目id
+	UIDs string      `json:"uids"` // 接收人uid
+	CIDs string      `json:"cids"` // client id
 	Data interface{} `json:"data"`
 }
 
 func ParsePush(payloadInterface interface{}) (payload *PayLoadPush, err error) {
 	payload = &PayLoadPush{}
+	payloadBytes, err := json.Marshal(payloadInterface)
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(payloadBytes, payload)
+	return
+}
+
+type PayloadRequest struct {
+	UID     string      `json:"uid"` // 发送人uid
+	CID     string      `json:"cid"` // 发送人 client id
+	Payload interface{} `json:"payload"`
+}
+
+func ParseRequest(payloadInterface interface{}) (payload *PayloadRequest, err error) {
+	payload = &PayloadRequest{}
 	payloadBytes, err := json.Marshal(payloadInterface)
 	if err != nil {
 		return

@@ -42,10 +42,6 @@ func (h *PushHandler) Handle(ctx context.Context, msg queuemessage.Message) (isA
 		finalClients = intersect(finalClients, clients)
 	}
 
-	if payload.Tags != "" {
-		clients := manager.ClientByTags(ctx, strings.Split(payload.Tags, ",")...)
-		finalClients = intersect(finalClients, clients)
-	}
 	if len(finalClients) == 0 {
 		logger.Debugf(ctx, "push msg not found client,msg:%+v", payload)
 		return

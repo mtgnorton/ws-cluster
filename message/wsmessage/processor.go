@@ -1,8 +1,10 @@
 package wsmessage
 
-var DefaultProcessor Processor = NewJsonProcessor()
+var DefaultWsProcessor Processor = NewJsonProcessor()
 
 type Processor interface {
-	Decode(messageBytes []byte) (message *Req, err error)
-	Encode(message *Res) (messageBytes []byte, err error)
+	ReqEncode(message *Req) (messageBytes []byte, err error)
+	ReqDecode(messageBytes []byte) (message *Req, err error)
+	ResEncode(message *Res) (messageBytes []byte, err error)
+	ResDecode(messageBytes []byte) (message *Res, err error)
 }

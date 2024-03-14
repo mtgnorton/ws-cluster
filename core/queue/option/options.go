@@ -36,12 +36,12 @@ func NewOptions(opts ...Option) Options {
 	}
 
 	options.Handlers = map[queuemessage.Type]handler.Handle{
-		queuemessage.TypeSubscribe:   handler.NewSubHandler(),
-		queuemessage.TypeRequest:     handler.NewReqHandler(),
-		queuemessage.TypeUnsubscribe: handler.NewUnSubHandler(),
-		queuemessage.TypePush:        handler.NewPushHandler(),
-		queuemessage.TypeConnect:     handler.NewConnectHandler(),
-		queuemessage.TypeDisconnect:  handler.NewDisconnectHandler(),
+		// queuemessage.TypeSubscribe:   handler.NewSubHandler(),
+		queuemessage.TypeRequest: handler.NewReqHandler(),
+		// queuemessage.TypeUnsubscribe: handler.NewUnSubHandler(),
+		queuemessage.TypePush:       handler.NewPushHandler(),
+		queuemessage.TypeConnect:    handler.NewConnectHandler(),
+		queuemessage.TypeDisconnect: handler.NewDisconnectHandler(),
 	}
 	for _, o := range opts {
 		o(&options)

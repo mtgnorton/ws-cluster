@@ -41,7 +41,7 @@ func (c *defaultClient) Read(ctx context.Context) (msg *wsmessage.Req, isTermina
 	if err != nil {
 		return nil, true, err
 	}
-	msg, err = c.opts.messageProcessor.Decode(msgBytes)
+	msg, err = c.opts.messageProcessor.ReqDecode(msgBytes)
 	return
 }
 

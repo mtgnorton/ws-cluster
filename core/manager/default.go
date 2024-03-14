@@ -14,7 +14,6 @@ type manager struct {
 	clients       map[string]client.Client // key:clientID value:client
 	uClients      map[string][]string      // key:uid value:clientID
 	pClients      map[string][]string      // key:pid value:clientID
-	tagClients    map[string][]string      // key:tag value:clientID
 	serverClients map[string][]string      // key:pid value:clientID
 	adminClients  []string                 // value:clientID
 	deadlock.RWMutex
@@ -92,6 +91,7 @@ func (m *manager) Clients(ctx context.Context, clientIDs ...string) []client.Cli
 	return clients
 }
 
+// todo 重构
 func (m *manager) ClientsByUIDs(ctx context.Context, userIDs ...string) []client.Client {
 	m.RLock()
 	defer m.RUnlock()
@@ -111,18 +111,6 @@ func (m *manager) ClientsByPIDs(ctx context.Context, projectIDs ...string) []cli
 	var clients []client.Client
 	for _, pid := range projectIDs {
 		for _, id := range m.pClients[pid] {
-			clients = append(clients, m.clients[id])
-		}
-	}
-	return clients
-}
-
-func (m *manager) ClientByTags(ctx context.Context, tags ...string) []client.Client {
-	m.RLock()
-	defer m.RUnlock()
-	var clients []client.Client
-	for _, tag := range tags {
-		for _, id := range m.tagClients[tag] {
 			clients = append(clients, m.clients[id])
 		}
 	}
@@ -175,29 +163,6 @@ func (m *manager) checkExpired(ctx context.Context) {
 	}
 }
 
-func (m *manager) BindTag(ctx context.Context, client client.Client, tags ...string) {
-	m.Lock()
-	defer m.Unlock()
-	id, _, _ := client.GetIDs()
-	for _, tag := range tags {
-		m.tagClients[tag] = append(m.tagClients[tag], id)
-	}
-	m.opts.logger.Debugf(ctx, "manager-BindTag  %s to client %s", tags, client)
-}
-func (m *manager) UnbindTag(ctx context.Context, client client.Client, tags ...string) {
-	m.Lock()
-	defer m.Unlock()
-	id, _, _ := client.GetIDs()
-	for _, tag := range tags {
-		for i, cid := range m.tagClients[tag] {
-			if cid == id {
-				m.tagClients[tag] = append(m.tagClients[tag][:i], m.tagClients[tag][i+1:]...)
-			}
-		}
-	}
-	m.opts.logger.Debugf(ctx, "manager-UnbindTag  %s from client %s", tags, client)
-}
-
 func NewManager(opts ...Option) Manager {
 	options := NewOptions(opts...)
 	return &manager{
@@ -205,7 +170,6 @@ func NewManager(opts ...Option) Manager {
 		clients:       make(map[string]client.Client),
 		uClients:      make(map[string][]string),
 		pClients:      make(map[string][]string),
-		tagClients:    make(map[string][]string),
 		serverClients: make(map[string][]string),
 	}
 }
