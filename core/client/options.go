@@ -34,7 +34,7 @@ type Options struct {
 func NewOptions(opts ...Option) *Options {
 	options := &Options{
 		ctx:              context.Background(),
-		messageProcessor: wsmessage.DefaultProcessor,
+		messageProcessor: wsmessage.DefaultWsProcessor,
 		logger:           logger.DefaultLogger,
 	}
 	for _, o := range opts {

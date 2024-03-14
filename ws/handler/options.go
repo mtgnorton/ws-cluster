@@ -21,7 +21,7 @@ func NewOptions(opts ...Option) *Options {
 	options := &Options{
 		manager:   manager.DefaultManager,
 		logger:    logger.DefaultLogger,
-		processor: wsmessage.DefaultProcessor,
+		processor: wsmessage.DefaultWsProcessor,
 		queue:     queue.GetQueueInstance(config.DefaultConfig),
 	}
 	for _, o := range opts {

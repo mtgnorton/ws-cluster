@@ -53,7 +53,9 @@ func (s *gfServer) Run() {
 	s.opts.logger.Debugf(context.Background(), "ws server run on port:%d", s.opts.port)
 	s.server.SetPort(s.opts.port)
 
-	go s.RegisterToRegistryLoop()
+	if s.opts.config.Values().Router.Enable {
+		go s.RegisterToRegistryLoop()
+	}
 
 	s.server.Run()
 
@@ -78,6 +80,9 @@ func (s *gfServer) connect(r *ghttp.Request) {
 
 	claims, err := shared.DefaultJwtWs.Parse(token)
 	if err != nil {
+		_ = socket.WriteMessage(1, []byte("token error"))
+		_ = socket.Close()
+
 		logger.Debugf(ctx, "Websocket token is error")
 		r.Exit()
 	}
@@ -99,7 +104,6 @@ func (s *gfServer) connect(r *ghttp.Request) {
 		//		scope.SetExtra("gf_sentry_key˚", "11111")
 		//	})
 		//}
-
 		msg, isTerminate, err := c.Read(ctx)
 		if isTerminate {
 			logger.Infof(ctx, "Websocket Read err: %v", err)

@@ -60,7 +60,7 @@ func main() {
 				return
 			}
 			log.Println("收到:", string(messageBytes))
-			wsMsg, err := wsmessage.DefaultProcessor.Decode(messageBytes)
+			wsMsg, err := wsmessage.DefaultWsProcessor.ReqDecode(messageBytes)
 			if err != nil {
 				log.Printf("解析messageBytes消息错误:%v\n", err)
 				continue
@@ -138,7 +138,6 @@ func NewPushMsg(uids string, data interface{}) interface{} {
 			PID:  "1",
 			UIDs: uids,
 			CIDs: "",
-			Tags: "",
 			Data: data,
 		},
 	}
