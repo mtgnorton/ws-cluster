@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/mtgnorton/ws-cluster/logger"
-	"github.com/mtgnorton/ws-cluster/message/wsmessage"
 )
 
 type Device string
@@ -26,16 +25,14 @@ type DeviceInfo struct {
 type Option func(o *Options)
 
 type Options struct {
-	ctx              context.Context
-	messageProcessor wsmessage.Processor
-	logger           logger.Logger
+	ctx    context.Context
+	logger logger.Logger
 }
 
 func NewOptions(opts ...Option) *Options {
 	options := &Options{
-		ctx:              context.Background(),
-		messageProcessor: wsmessage.DefaultWsProcessor,
-		logger:           logger.DefaultLogger,
+		ctx:    context.Background(),
+		logger: logger.DefaultLogger,
 	}
 	for _, o := range opts {
 		o(options)
@@ -46,12 +43,6 @@ func NewOptions(opts ...Option) *Options {
 func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
 		o.ctx = ctx
-	}
-}
-
-func WithMessageProcessor(p wsmessage.Processor) Option {
-	return func(o *Options) {
-		o.messageProcessor = p
 	}
 }
 

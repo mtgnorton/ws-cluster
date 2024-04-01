@@ -8,21 +8,19 @@ import (
 	"github.com/mtgnorton/ws-cluster/shared"
 	"github.com/sasha-s/go-deadlock"
 
-	"github.com/mtgnorton/ws-cluster/message/wsmessage"
-
 	"github.com/gorilla/websocket"
 )
 
 type defaultClient struct {
-	opts            *Options
-	ID              string
-	UID             string
-	PID             string
-	cancel          context.CancelFunc
-	cType           CType           // 用户端还是服务端
-	socket          *websocket.Conn // 连接
-	lastReceiveTime int64
-	messageChan     chan interface{}
+	opts             *Options
+	ID               string
+	UID              string
+	PID              string
+	cancel           context.CancelFunc
+	cType            CType           // 用户端还是服务端
+	socket           *websocket.Conn // 连接
+	lastInteractTime int64
+	messageChan      chan interface{}
 	deadlock.RWMutex
 }
 
@@ -36,16 +34,16 @@ func (c *defaultClient) Options() Options {
 	return *c.opts
 }
 
-func (c *defaultClient) Read(ctx context.Context) (msg *wsmessage.Req, isTerminate bool, err error) {
-	_, msgBytes, err := c.socket.ReadMessage()
-	if err != nil {
-		return nil, true, err
-	}
-	msg, err = c.opts.messageProcessor.ReqDecode(msgBytes)
-	return
-}
+//func (c *defaultClient) Read(ctx context.Context) (msg *wsmessage.Req, isTerminate bool, err error) {
+//	_, msgBytes, err := c.socket.ReadMessage()
+//	if err != nil {
+//		return nil, true, err
+//	}
+//	msg, err = c.opts.messageProcessor.ReqDecode(msgBytes)
+//	return
+//}
 
-func (c *defaultClient) Send(ctx context.Context, message *wsmessage.Res) {
+func (c *defaultClient) Send(ctx context.Context, message interface{}) {
 	defer func() {
 		if err := recover(); err != nil {
 			c.opts.logger.Debugf(ctx, "send message recover err:%v", err)
@@ -58,7 +56,8 @@ func (c *defaultClient) Send(ctx context.Context, message *wsmessage.Res) {
 		return
 	}
 	c.messageChan <- message
-	c.opts.logger.Debugf(ctx, "send message:%v finish", message)
+
+	// c.opts.logger.Debugf(ctx, "send message:%v finish", message)
 }
 
 func (c *defaultClient) Close() {
@@ -79,16 +78,16 @@ func (c *defaultClient) Status() Status {
 	return StatusNormal
 }
 
-func (c *defaultClient) UpdateReplyTime() {
+func (c *defaultClient) UpdateInteractTime() {
 	c.Lock()
 	defer c.Unlock()
-	c.lastReceiveTime = time.Now().Unix()
+	c.lastInteractTime = time.Now().Unix()
 }
 
-func (c *defaultClient) GetReplyTime() int64 {
+func (c *defaultClient) GetInteractTime() int64 {
 	c.RLock()
 	defer c.RUnlock()
-	return c.lastReceiveTime
+	return c.lastInteractTime
 }
 
 func (c *defaultClient) GetIDs() (id string, uid string, pid string) {
@@ -104,7 +103,7 @@ func (c *defaultClient) Type() CType {
 }
 
 func (c *defaultClient) String() string {
-	return fmt.Sprintf("Client[ID:%s,UID:%s,PID:%s,Type:%s]", c.ID, c.UID, c.PID, c.cType)
+	return fmt.Sprintf("User[ID:%s,UID:%s,PID:%s,Type:%s]", c.ID, c.UID, c.PID, c.cType)
 }
 
 func (c *defaultClient) sendLoop(ctx context.Context) {

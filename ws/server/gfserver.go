@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/shared"
+	"github.com/mtgnorton/ws-cluster/shared/auth"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gfile"
+	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/client"
-	"github.com/mtgnorton/ws-cluster/message/wsmessage"
 	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 	"github.com/mtgnorton/ws-cluster/tools/wssentry"
 )
@@ -78,25 +78,26 @@ func (s *gfServer) connect(r *ghttp.Request) {
 
 	token := r.Get("token").String()
 
-	claims, err := shared.DefaultJwtWs.Parse(token)
+	// claims, err := shared.DefaultJwtWs.Parse(token)
+
+	userData, err := auth.Decode(token)
 	if err != nil {
 		_ = socket.WriteMessage(1, []byte("token error"))
 		_ = socket.Close()
-
-		logger.Debugf(ctx, "Websocket token is error")
+		logger.Debugf(ctx, "Websocket token is error:%v", err)
 		r.Exit()
 	}
 
-	c := client.NewClient(ctx, claims.UID, claims.PID, client.CType(claims.ClientType), socket.Conn)
+	c := client.NewClient(ctx, userData.UID, userData.PID, client.CType(userData.ClientType), socket.Conn)
 
 	s.opts.manager.Join(ctx, c)
 
-	s.opts.handler.Handle(ctx, c, &wsmessage.Req{
-		Type: wsmessage.TypeConnect,
+	s.opts.handler.Handle(ctx, c, &clustermessage.AffairMsg{
+		Type: clustermessage.TypeConnect,
 	})
 
 	s.addMetrics()
-	c.Send(ctx, wsmessage.NewSuccessRes("connect success", ""))
+	c.Send(ctx, clustermessage.NewSuccessResp("connect success"))
 	for {
 
 		//if hub := wssentry.GetHubFromContext(r); hub != nil {
@@ -104,18 +105,25 @@ func (s *gfServer) connect(r *ghttp.Request) {
 		//		scope.SetExtra("gf_sentry_key˚", "11111")
 		//	})
 		//}
-		msg, isTerminate, err := c.Read(ctx)
-		if isTerminate {
+		_, msgBytes, err := socket.ReadMessage()
+
+		if err != nil {
 			logger.Infof(ctx, "Websocket Read err: %v", err)
 			s.opts.manager.Remove(ctx, c)
-			s.opts.handler.Handle(ctx, c, &wsmessage.Req{
-				Type: wsmessage.TypeDisconnect,
+			s.opts.handler.Handle(ctx, c, &clustermessage.AffairMsg{
+				Type: clustermessage.TypeDisconnect,
 			})
 			err = s.opts.prometheus.GetAdd(wsprometheus.MetricWsConnection, nil, -1)
 			if err != nil {
 				logger.Infof(ctx, "Websocket GetAdd err: %v", err)
 			}
 			return
+		}
+
+		msg, err := clustermessage.ParseAffair(msgBytes)
+		if err != nil {
+			logger.Infof(ctx, "parse err:%v", err)
+			continue
 		}
 		s.opts.handler.Handle(ctx, c, msg)
 	}

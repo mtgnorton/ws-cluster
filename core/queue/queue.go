@@ -4,11 +4,10 @@ import (
 	"context"
 	"sync"
 
+	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/config"
 
 	"github.com/mtgnorton/ws-cluster/core/queue/option"
-
-	"github.com/mtgnorton/ws-cluster/message/queuemessage"
 )
 
 var QueueInstance Queue
@@ -18,7 +17,7 @@ var QueueInstance Queue
 // 所有的服务端都能够收到所有的消息
 type Queue interface {
 	Options() option.Options
-	Publish(ctx context.Context, message *queuemessage.Message) error
+	Publish(ctx context.Context, message *clustermessage.AffairMsg) error
 
 	// ack的逻辑
 	// 1. 该消息不属于该服务端，需要ack

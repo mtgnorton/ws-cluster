@@ -132,6 +132,8 @@ func encoder() zapcore.Encoder {
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+
 	return zapcore.NewConsoleEncoder(encoderConfig)
 }
 
@@ -175,7 +177,12 @@ func normalWriter(config config.Config) zapcore.WriteSyncer {
 		Compress:   lc.Compress,
 	}
 
-	writers := []io.Writer{lumberJackLogger}
+	syncWriter := &zapcore.BufferedWriteSyncer{
+		WS:   zapcore.AddSync(lumberJackLogger),
+		Size: 4096,
+	}
+
+	writers := []io.Writer{syncWriter}
 
 	if lc.Print {
 		writers = append(writers, os.Stdout)
