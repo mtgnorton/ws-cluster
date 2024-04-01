@@ -31,7 +31,7 @@ func (h *ServerHandler) Handle(ctx context.Context, msg *clustermessage.AffairMs
 		return
 	}
 	if len(UIDs) > 0 {
-		uClients := manager.ClientsByUIDs(ctx, UIDs...)
+		uClients := manager.ClientsByUIDs(ctx, pid, UIDs...)
 		// 求交集
 		finalClients = intersect(finalClients, uClients)
 	}
