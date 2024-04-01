@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -28,7 +29,7 @@ func (c *viperConfig) load() Config {
 		panic(err)
 	}
 
-	pflag.String("env", "prod", "set env,options:dev,prod,local")
+	pflag.String("env", "", "set env,options:dev,prod,local")
 	pflag.String("node", "100", "set node,usage snowflake node id and sentry")
 	pflag.Int("ws_port", 8084, "set ws server port")
 	pflag.Int("http_port", 8085, "set http server port")
@@ -40,6 +41,13 @@ func (c *viperConfig) load() Config {
 	err = viper.BindPFlag("env", pflag.Lookup("env"))
 	if err != nil {
 		panic(err)
+	}
+
+	env := pflag.Lookup("env").Value.String()
+	if env != "" { // 如果设置了env，则加载对应的配置文件,否则加载默认的配置文件
+		configName := "config." + env + ".yaml"
+		viper.SetConfigName(configName)
+		fmt.Println("configName:", configName)
 	}
 	err = viper.BindPFlag("node", pflag.Lookup("node"))
 	if err != nil {

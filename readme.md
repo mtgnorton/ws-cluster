@@ -21,7 +21,7 @@
    地址： https://docs.sentry.io/
 
 ## 使用
-./ws-cluster --node 200 --ws_port 8812 --http_port 8912 --queue redis 
+./ws-cluster --node 200 --ws_port 8812 --http_port 8912 --queue redis  --env dev
 
 ## 流程
 
