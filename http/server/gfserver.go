@@ -6,13 +6,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/client"
 
 	"github.com/mtgnorton/ws-cluster/shared"
-
-	"github.com/mtgnorton/ws-cluster/message/httpmessage"
-
-	"github.com/mtgnorton/ws-cluster/message/queuemessage"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -105,33 +102,29 @@ func (g gfServer) handler(r *ghttp.Request) {
 
 	claims, err := shared.DefaultJwtWs.Parse(r.Get("token").String())
 	if err != nil {
-		r.Response.WriteJson(httpmessage.NewErrorRes("token is error"))
+		r.Response.WriteJson(clustermessage.NewErrorResp("token error"))
 		return
 	}
 	if claims.ClientType == int(client.CTypeUser) {
-		r.Response.WriteJson(httpmessage.NewErrorRes("permission denied"))
+		r.Response.WriteJson(clustermessage.NewErrorResp("permission denied"))
 		return
 	}
-	msg := httpmessage.Req{}
+	msg := &clustermessage.AffairMsg{}
 	err = json.Unmarshal(r.GetBody(), &msg)
 	if err != nil {
-		r.Response.WriteJson(httpmessage.NewErrorRes("parse message error"))
+		r.Response.WriteJson(clustermessage.NewErrorResp("parse message error"))
 		return
 	}
 	// 随机休眠0-10s
 	// time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
 
-	queueMsg := &queuemessage.Message{
-		Type:    queuemessage.TypePush,
-		PID:     claims.PID,
-		Payload: msg.Payload,
-	}
+	msg.Type = clustermessage.TypePush
 
-	err = g.opts.queue.Publish(r.Context(), queueMsg)
+	err = g.opts.queue.Publish(r.Context(), msg)
 	if err != nil {
 		g.opts.logger.Warnf(r.Context(), "publish message error:%s", err.Error())
-		r.Response.WriteJson(httpmessage.NewErrorRes("publish message error"))
+		r.Response.WriteJson(clustermessage.NewErrorResp("publish message error"))
 		return
 	}
-	r.Response.WriteJson(httpmessage.NewSuccessRes())
+	r.Response.WriteJson(clustermessage.NewSuccessResp())
 }

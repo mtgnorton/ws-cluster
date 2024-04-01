@@ -156,7 +156,7 @@ func (m *manager) checkExpired(ctx context.Context) {
 	m.RLock()
 	defer m.RUnlock()
 	for _, c := range m.clients {
-		if time.Now().Unix()-c.GetReplyTime() > 60 {
+		if time.Now().Unix()-c.GetInteractTime() > 60 {
 			m.opts.logger.Debugf(ctx, "checkExpired client %s expired", c)
 			m.Remove(ctx, c)
 		}

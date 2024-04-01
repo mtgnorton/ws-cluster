@@ -2,8 +2,6 @@ package client
 
 import (
 	"context"
-
-	"github.com/mtgnorton/ws-cluster/message/wsmessage"
 )
 
 type Status int
@@ -17,9 +15,9 @@ type CType int
 
 // 一个连接上来的client，可能是用户端，可能是服务端,也可能是管理端
 const (
-	CTypeUser   CType = 0 // 用户端
-	CTypeServer CType = 1 // 服务端
-	CTypeAdmin  CType = 2 // 管理端
+	CTypeUser   CType = 0       // 用户端
+	CTypeServer CType = 32832   // 服务端
+	CTypeAdmin  CType = 5345345 // 管理端
 )
 
 func (c CType) String() string {
@@ -38,13 +36,14 @@ func (c CType) String() string {
 type Client interface {
 	Init(opts ...Option)
 	Options() Options
-	Read(ctx context.Context) (message *wsmessage.Req, isTerminate bool, err error)
-	Send(ctx context.Context, message *wsmessage.Res)
+	//Read(ctx context.Context) (message *wsmessage.Req, isTerminate bool, err error)
+	// message 直接为golang类型
+	Send(ctx context.Context, message interface{})
 	Close()
 	Status() Status
-	UpdateReplyTime()
-	GetReplyTime() int64
-	GetIDs() (id string, uid string, pid string)
+	UpdateInteractTime()
+	GetInteractTime() int64
+	GetIDs() (cid string, uid string, pid string)
 	Type() CType
 	String() string
 }

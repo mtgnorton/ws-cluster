@@ -3,11 +3,11 @@ package handler
 import (
 	"context"
 
-	"github.com/mtgnorton/ws-cluster/message/queuemessage"
+	"github.com/mtgnorton/ws-cluster/clustermessage"
 )
 
-var DefaultPushHandler = NewPushHandler()
+var DefaultPushHandler = NewServerHandler()
 
 type Handle interface {
-	Handle(ctx context.Context, payload queuemessage.Message) (isAck bool)
+	Handle(ctx context.Context, payload *clustermessage.AffairMsg) (isAck bool)
 }
