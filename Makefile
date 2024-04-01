@@ -11,4 +11,5 @@ tail-log:
 	tail -n 100 -f logs/normal.log
 
 run-wikitrade:
-	go build -o wikitrade-client examples/wikitrade/server.go;nohup ./wikitrade-client &
+	go build -o  examples/wikitrade/ws-demo-server examples/wikitrade/server.go;
+	nohup ./examples/wikitrade/ws-demo-server  &
