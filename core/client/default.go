@@ -122,6 +122,7 @@ func (c *defaultClient) sendLoop(ctx context.Context) {
 	}
 }
 
+// NewClient 创建一个新的客户端,uid,pid为用户id和项目id,socket为websocket连接
 func NewClient(ctx context.Context, uid string, pid string, cType CType, socket *websocket.Conn, options ...Option) Client {
 	ctx, cancel := context.WithCancel(ctx)
 	options = append(options, WithContext(ctx))

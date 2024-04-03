@@ -4,6 +4,7 @@ import (
 	"context"
 )
 
+// Status 客户端状态,正常或者关闭
 type Status int
 
 const (
@@ -11,9 +12,9 @@ const (
 	StatusClosed
 )
 
+// CType 客户端类型,一个连接上来的client，可能是用户端，可能是服务端,也可能是管理端
 type CType int
 
-// 一个连接上来的client，可能是用户端，可能是服务端,也可能是管理端
 const (
 	CTypeUser   CType = 0       // 用户端
 	CTypeServer CType = 32832   // 服务端

@@ -12,7 +12,7 @@ import (
 	"github.com/IBM/sarama"
 )
 
-type KafkaSyncQueue struct {
+type kafkaSyncQueue struct {
 	opts     option.Options
 	producer *kafka.Producer
 	consumer *kafka.ConsumerGroup
@@ -25,7 +25,7 @@ func NewKafkaQueue(opts ...option.Option) (q Queue) {
 	if err != nil {
 		panic(err)
 	}
-	k := &KafkaSyncQueue{
+	k := &kafkaSyncQueue{
 		opts:     options,
 		producer: producer,
 	}
@@ -37,11 +37,11 @@ func NewKafkaQueue(opts ...option.Option) (q Queue) {
 	return k
 }
 
-func (k KafkaSyncQueue) Options() option.Options {
+func (k kafkaSyncQueue) Options() option.Options {
 	return k.opts
 }
 
-func (k KafkaSyncQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) error {
+func (k kafkaSyncQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) error {
 	messageBytes, err := clustermessage.PackAffair(m)
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func (k KafkaSyncQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg
 }
 
 // Consume 该方法的上游一直读取消息，上游会将每条消息传递给该方法
-func (k KafkaSyncQueue) Consume(ctx context.Context, integration interface{}) (err error) {
+func (k kafkaSyncQueue) Consume(ctx context.Context, integration interface{}) (err error) {
 
 	defer func() {
 		if err != nil {

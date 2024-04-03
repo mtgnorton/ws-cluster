@@ -67,9 +67,10 @@ func (w *WsHandler) Server(ctx context.Context, c client.Client, msg *clustermes
 
 	err := queue.Publish(ctx, msg)
 	if err != nil {
-		logger.Infof(ctx, "WsHandler-push publish error %v", err)
+		logger.Infof(ctx, "WsHandler-push server publish error %v", err)
 		return
 	}
+	logger.Debugf(ctx, "WsHandler-push server publish success,msg:%v", msg)
 	if msg.AckID != "" {
 		c.Send(ctx, clustermessage.NewAck(msg.AckID))
 	}
@@ -86,10 +87,10 @@ func (w *WsHandler) User(ctx context.Context, c client.Client, msg *clustermessa
 	}
 	err := w.opts.queue.Publish(ctx, msg)
 	if err != nil {
-		w.opts.logger.Infof(ctx, "WsHandler-request publish error %v", err)
+		w.opts.logger.Infof(ctx, "WsHandler-request user publish error %v", err)
 		return
 	}
-	w.opts.logger.Debugf(ctx, "WsHandler-request publish success,msg:%v", msg)
+	w.opts.logger.Debugf(ctx, "WsHandler-request user publish success,msg:%v", msg)
 	if msg.AckID != "" {
 		c.Send(ctx, clustermessage.NewAck(msg.AckID))
 	}
