@@ -19,7 +19,7 @@ type SendToUserMessage struct {
 
 func (h *ServerHandler) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
 	logger, manager, isAck := h.opts.logger, h.opts.manager, true
-	pid, UIDs, CIDs := msg.To.PID, msg.To.UIDs, msg.To.CIDs
+	pid, uids, cids := msg.To.PID, msg.To.UIDs, msg.To.CIDs
 	if pid == "" {
 		logger.Infof(ctx, "push msg pid is empty,msg:%+v", msg)
 		return
@@ -30,14 +30,14 @@ func (h *ServerHandler) Handle(ctx context.Context, msg *clustermessage.AffairMs
 		logger.Debugf(ctx, "push msg pid %s not found,msg:%+v", pid, msg)
 		return
 	}
-	if len(UIDs) > 0 {
-		uClients := manager.ClientsByUIDs(ctx, pid, UIDs...)
+	if len(uids) > 0 {
+		uClients := manager.ClientsByUIDs(ctx, pid, uids...)
 		// 求交集
 		finalClients = intersect(finalClients, uClients)
 	}
 
-	if len(CIDs) > 0 {
-		clients := manager.Clients(ctx, CIDs...)
+	if len(cids) > 0 {
+		clients := manager.Clients(ctx, cids...)
 		finalClients = intersect(finalClients, clients)
 	}
 
@@ -45,6 +45,7 @@ func (h *ServerHandler) Handle(ctx context.Context, msg *clustermessage.AffairMs
 		logger.Debugf(ctx, "push msg not found client,msg:%+v", msg)
 		return
 	}
+
 	for _, client := range finalClients {
 		client.Send(ctx, SendToUserMessage{
 			AffairID: msg.AffairID,

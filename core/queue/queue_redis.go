@@ -11,7 +11,7 @@ import (
 	"github.com/mtgnorton/ws-cluster/core/queue/option"
 )
 
-type RedisQueue struct {
+type redisQueue struct {
 	opts         option.Options
 	redisClient  *redis.Client
 	groupName    string
@@ -30,7 +30,7 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 	c := options.Config
 	redisClient := redis.NewClient(&redis.Options{Addr: c.Values().Queue.Redis.Addr, Password: c.Values().Queue.Redis.Password, Username: c.Values().Queue.Redis.User, DB: c.Values().Queue.Redis.DB})
 
-	return &RedisQueue{
+	return &redisQueue{
 		opts:         options,
 		redisClient:  redisClient,
 		groupName:    "group-" + fmt.Sprint(options.Config.Values().Node),
@@ -38,10 +38,10 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 	}
 }
 
-func (q *RedisQueue) Options() option.Options {
+func (q *redisQueue) Options() option.Options {
 	return q.opts
 }
-func (q *RedisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) error {
+func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) error {
 	messageBytes, err := clustermessage.PackAffair(m)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func (q *RedisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 }
 
 // Consume 开启一个协程，不断地从redis中读取消息
-func (q *RedisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
+func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 	queueRedis := q.redisClient
 	logger := q.opts.Logger
 	topic := q.opts.Topic

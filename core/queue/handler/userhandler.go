@@ -20,9 +20,14 @@ type SendToServerMessage struct {
 }
 
 func (h *UserHandler) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
-	manager, isAck := h.opts.manager, true
+	var (
+		logger  = h.opts.logger
+		manager = h.opts.manager
+	)
+	isAck = true
 
 	servers := manager.ServersByPID(ctx, msg.Source.PID)
+	logger.Debugf(ctx, "send to server msg:%+v, servers:%+v", msg, servers)
 	if len(servers) == 0 {
 		return
 	}
