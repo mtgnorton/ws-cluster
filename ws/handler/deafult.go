@@ -23,7 +23,6 @@ func (w *WsHandler) Handle(ctx context.Context, c client.Client, msg *clustermes
 	// 服务端: 推送
 	// 用户端: 请求
 	// 用户端的连接,断开事件需要通知服务端, 只处理客户端的连接,断开事件
-
 	// 判断是否是心跳消息
 	if msg.Type == clustermessage.TypeHeart {
 		c.Send(ctx, clustermessage.NewHeartResp(msg))
@@ -39,7 +38,6 @@ func (w *WsHandler) Handle(ctx context.Context, c client.Client, msg *clustermes
 	}
 
 	// 用户端或者业务端主动发送的消息
-
 	switch c.Type() {
 	case client.CTypeUser:
 		msg.Type = clustermessage.TypeRequest
