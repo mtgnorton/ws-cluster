@@ -67,7 +67,7 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 	queueRedis := q.redisClient
 	logger := q.opts.Logger
 	topic := q.opts.Topic
-	r1, err := queueRedis.XGroupCreateMkStream(ctx, string(topic), q.groupName, "$").Result()
+	r1, err := queueRedis.XGroupCreateMkStream(ctx, topic, q.groupName, "$").Result()
 	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
 		logger.Warnf(ctx, "consume failed to create group:%s,err:%v", q.groupName, err)
 		return err
@@ -80,6 +80,17 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 		}
 		logger.Infof(ctx, "queue-redis consumer end")
 	}()
+
+	// 假设宕机了10分钟，那么当再次启动时，这10分钟内的消息直接标记为已完成，不再消费
+	lastMessages := queueRedis.XRevRangeN(ctx, topic, "+", "-", 1).Val()
+	if len(lastMessages) > 0 {
+		logger.Debugf(ctx, "mark lastMessages msg:%v", lastMessages[0].ID)
+		_, err = queueRedis.XGroupSetID(ctx, topic, q.groupName, lastMessages[0].ID).Result()
+		if err != nil {
+			logger.Warnf(ctx, "consume failed to ack lastMessages msg:%s,err:%v", lastMessages[0].ID, err)
+			return err
+		}
+	}
 
 	for {
 
