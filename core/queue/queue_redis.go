@@ -19,7 +19,6 @@ type redisQueue struct {
 }
 
 func NewRedisQueue(opts ...option.Option) (q Queue) {
-
 	defer func() {
 		go func() {
 			_ = q.Consume(q.Options().Ctx, nil)
@@ -92,6 +91,8 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 		}
 	}
 
+	go q.xTrimLoop(ctx)
+
 	for {
 
 		var currentID = ">"
@@ -115,7 +116,7 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 		}
 
 		for _, msg := range streams[0].Messages {
-			//logger.Debugf(ctx, "consume topic:%s,msg id:%s,values:%s", topic, msg.ID, msg.Values)
+			logger.Debugf(ctx, "consume topic:%s,msg id:%s,values:%s", topic, msg.ID, msg.Values)
 			concreteMsgString := msg.Values["m"].(string)
 			concreteMsg, err := clustermessage.ParseAffair([]byte(concreteMsgString))
 			if err != nil {
@@ -135,6 +136,23 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 			} else {
 				logger.Warnf(ctx, "consume msg: %s,not ack", msg.Values["m"].(string))
 			}
+		}
+	}
+}
+
+func (q *redisQueue) xTrimLoop(ctx context.Context) {
+	ticker := time.NewTicker(time.Second * 20)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c, err := q.redisClient.XTrimMaxLenApprox(ctx, q.opts.Topic, 30000, 100).Result()
+			if err != nil {
+				q.opts.Logger.Warnf(ctx, "xTrimLoop failed to trim err:%v", err)
+			}
+			q.opts.Logger.Debugf(ctx, "xTrimLoop trim count:%d", c)
 		}
 	}
 }
