@@ -81,7 +81,6 @@ func (m *manager) Remove(ctx context.Context, c client.Client) {
 				m.pClients[pid].uClients[uid] = append(m.pClients[pid].uClients[uid][:i], m.pClients[pid].uClients[uid][i+1:]...)
 			}
 		}
-
 	}
 
 	m.opts.logger.Debugf(ctx, "manager-remove c %s", c)
@@ -99,6 +98,10 @@ func (m *manager) Clients(ctx context.Context, clientIDs ...string) []client.Cli
 		return clients
 	}
 	for _, id := range clientIDs {
+		if _, ok := m.clients[id]; !ok {
+			m.opts.logger.Debugf(ctx, "Clients client %s not exist", id)
+			continue
+		}
 		clients = append(clients, m.clients[id])
 	}
 	return clients
@@ -110,6 +113,10 @@ func (m *manager) ClientsByUIDs(ctx context.Context, projectID string, userIDs .
 	var clients []client.Client
 	for _, uid := range userIDs {
 		for _, cid := range m.pClients[projectID].uClients[uid] {
+			if _, ok := m.clients[cid]; !ok {
+				m.opts.logger.Debugf(ctx, "ClientsByUIDs client %s not exist", cid)
+				continue
+			}
 			clients = append(clients, m.clients[cid])
 		}
 	}
@@ -124,6 +131,10 @@ func (m *manager) ClientsByPIDs(ctx context.Context, projectIDs ...string) []cli
 	for _, pid := range projectIDs {
 		for _, ids := range m.pClients[pid].uClients {
 			for _, id := range ids {
+				if _, ok := m.clients[id]; !ok {
+					m.opts.logger.Debugf(ctx, "ClientsByPIDs client %s not exist", id)
+					continue
+				}
 				clients = append(clients, m.clients[id])
 			}
 		}
@@ -137,6 +148,9 @@ func (m *manager) ServersByPID(ctx context.Context, projectID string) []client.C
 	var clients []client.Client
 	for _, ids := range m.pClients[projectID].sClients {
 		for _, id := range ids {
+			if _, ok := m.clients[id]; !ok {
+				continue
+			}
 			clients = append(clients, m.clients[id])
 		}
 	}

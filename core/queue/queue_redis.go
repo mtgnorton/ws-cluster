@@ -99,7 +99,7 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 			Group:    q.groupName,
 			Consumer: q.consumerName,
 			Streams:  []string{string(topic), currentID},
-			Block:    time.Millisecond * 10,
+			Block:    time.Millisecond * 100,
 			Count:    100,
 		}).Result()
 
@@ -139,14 +139,14 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 }
 
 func (q *redisQueue) xTrimLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Second * 20)
+	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			c, err := q.redisClient.XTrimMaxLenApprox(ctx, q.opts.Topic, 30000, 100).Result()
+			c, err := q.redisClient.XTrimMaxLenApprox(ctx, q.opts.Topic, 30000, 500).Result()
 			if err != nil {
 				q.opts.Logger.Warnf(ctx, "xTrimLoop failed to trim err:%v", err)
 			}
