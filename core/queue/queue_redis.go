@@ -73,12 +73,12 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 	}
 	logger.Debugf(ctx, "create group:%s,rs:%v,err:%v", q.groupName, r1, err)
 
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Warnf(ctx, "queue-redis consumer panic:%v", r)
-		}
-		logger.Infof(ctx, "queue-redis consumer end")
-	}()
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		logger.Warnf(ctx, "queue-redis consumer panic:%v", r)
+	//	}
+	//	logger.Infof(ctx, "queue-redis consumer end")
+	//}()
 
 	// 假设宕机了10分钟，那么当再次启动时，这10分钟内的消息直接标记为已完成，不再消费
 	lastMessages := queueRedis.XRevRangeN(ctx, topic, "+", "-", 1).Val()
@@ -94,9 +94,7 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 	go q.xTrimLoop(ctx)
 
 	for {
-
 		var currentID = ">"
-
 		streams, err := queueRedis.XReadGroup(ctx, &redis.XReadGroupArgs{
 			Group:    q.groupName,
 			Consumer: q.consumerName,
@@ -105,6 +103,7 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 			Count:    100,
 		}).Result()
 
+		logger.Debugf(ctx, "consume streams msg length:%v,err:%v", len(streams), err)
 		if err == redis.Nil {
 			// Logger.Debugf(Ctx, "consume no msg")
 			continue
@@ -116,7 +115,6 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 		}
 
 		for _, msg := range streams[0].Messages {
-			logger.Debugf(ctx, "consume topic:%s,msg id:%s,values:%s", topic, msg.ID, msg.Values)
 			concreteMsgString := msg.Values["m"].(string)
 			concreteMsg, err := clustermessage.ParseAffair([]byte(concreteMsgString))
 			if err != nil {
