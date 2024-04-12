@@ -79,7 +79,7 @@ func (z ZapLogger) Panicf(ctx context.Context, template string, args ...interfac
 }
 
 func newZapLogger(config config.Config) *zap.SugaredLogger {
-	normalWriter := normalWriter(config)
+	writer := simpleWriter(config)
 	// errorWriter := errorWriter(config)
 
 	encoder := encoder()
@@ -109,11 +109,11 @@ func newZapLogger(config config.Config) *zap.SugaredLogger {
 	//	zapcore.NewCore(encoder, errorWriter, zap.ErrorLevel),
 	//}
 	//if level < zapcore.ErrorLevel {
-	//	cores = append(cores, zapcore.NewCore(encoder, normalWriter, level))
+	//	cores = append(cores, zapcore.NewCore(encoder, partitionWriter, level))
 	//}
 
 	cores := []zapcore.Core{
-		zapcore.NewCore(encoder, normalWriter, level),
+		zapcore.NewCore(encoder, writer, level),
 	}
 
 	tee := zapcore.NewTee(cores...)
@@ -158,7 +158,34 @@ func attachSentry(log *zap.Logger, client *sentry.Client) *zap.Logger {
 	// if you have web service, create a new scope somewhere in middleware to have valid breadcrumbs.
 	return log.With(zapsentry.NewScope())
 }
-func normalWriter(config config.Config) zapcore.WriteSyncer {
+
+func simpleWriter(config config.Config) zapcore.WriteSyncer {
+	lc := config.Values().Log
+
+	if lc.Path != "" {
+		// 去除最后的/
+		if lc.Path[len(lc.Path)-1] == '/' {
+			lc.Path = lc.Path[:len(lc.Path)-1]
+		}
+		lc.Path = lc.Path + "/normal.log"
+	}
+
+	simple, err := os.OpenFile(lc.Path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		panic(err)
+	}
+
+	writers := []io.Writer{simple}
+
+	if lc.Print {
+		writers = append(writers, os.Stdout)
+	}
+
+	return zapcore.AddSync(io.MultiWriter(writers...))
+}
+
+//golint:ignore
+func partitionWriter(config config.Config) zapcore.WriteSyncer {
 	lc := config.Values().Log
 
 	if lc.Path != "" {

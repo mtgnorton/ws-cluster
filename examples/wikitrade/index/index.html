@@ -192,11 +192,11 @@
                 url: "",
             },
             wsUrls: {
-                "ws://192.168.18.115:8084/connect": "ws://192.168.18.115:8084/connect",
+                "ws://localhost:8084/connect": "ws://localhost:8084/connect",
                 "ws://192.168.200.140:8084/connect": "ws://192.168.200.140:8084/connect",
             },
             market: {
-                symbols: ""
+                symbols: "EURUSDm"
             },
             // 	// 1 minute.
             // PeriodM1 Period = 1
@@ -228,7 +228,7 @@
                 "月线": "43200",
             },
             kline: {
-                symbol: "",
+                symbol: "EURUSDm",
                 period: "1",
             },
             formLabelWidth: '120px',
@@ -240,6 +240,10 @@
                 if (item.indexOf("loginInfo") !== -1) {
                     console.log("loginInfo from cookie", item);
                     this.loginInfo = JSON.parse(item.split("=")[1]);
+                }
+                if (item.indexOf("market") !== -1) {
+                    console.log("market from cookie", item);
+                    this.market.symbols = item.split("=")[1];
                 }
             });
 
@@ -338,6 +342,7 @@
                     },
 
                 }
+                document.Cookie = "market=" + this.market.symbols;
                 this.sendMessage(msg);
             },
             subKline() {

@@ -27,7 +27,7 @@ func (h *UserHandler) Handle(ctx context.Context, msg *clustermessage.AffairMsg)
 	isAck = true
 
 	servers := manager.ServersByPID(ctx, msg.Source.PID)
-	logger.Debugf(ctx, "send to server msg:%+v, servers:%+v", msg, servers)
+	logger.Debugf(ctx, "Send to server msg:%+v, servers:%+v", msg, servers)
 	if len(servers) == 0 {
 		return
 	}

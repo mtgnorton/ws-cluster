@@ -6,16 +6,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sasha-s/go-deadlock"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/queue/option"
 )
 
 type redisQueue struct {
-	opts         option.Options
-	redisClient  *redis.Client
-	groupName    string
-	consumerName string
+	opts            option.Options
+	redisClient     *redis.Client
+	groupName       string
+	consumerName    string
+	lastReceiveTime time.Time
+	mu              deadlock.RWMutex
 }
 
 func NewRedisQueue(opts ...option.Option) (q Queue) {
@@ -63,9 +67,11 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 
 // Consume 开启一个协程，不断地从redis中读取消息
 func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
-	queueRedis := q.redisClient
-	logger := q.opts.Logger
-	topic := q.opts.Topic
+	var (
+		queueRedis = q.redisClient
+		logger     = q.opts.Logger
+		topic      = q.opts.Topic
+	)
 	r1, err := queueRedis.XGroupCreateMkStream(ctx, topic, q.groupName, "$").Result()
 	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
 		logger.Warnf(ctx, "consume failed to create group:%s,err:%v", q.groupName, err)
@@ -93,49 +99,89 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 
 	go q.xTrimLoop(ctx)
 
+	var cancel context.CancelFunc
+
+	ctx, cancel = context.WithCancel(ctx)
+	go q.consume(ctx)
+
+	ticker := time.NewTicker(time.Second)
 	for {
-		var currentID = ">"
-		streams, err := queueRedis.XReadGroup(ctx, &redis.XReadGroupArgs{
-			Group:    q.groupName,
-			Consumer: q.consumerName,
-			Streams:  []string{string(topic), currentID},
-			Block:    time.Millisecond * 100,
-			Count:    100,
-		}).Result()
-
-		logger.Debugf(ctx, "consume streams msg length:%v,err:%v", len(streams), err)
-		if err == redis.Nil {
-			// Logger.Debugf(Ctx, "consume no msg")
-			continue
+		select {
+		case <-ticker.C:
+			q.mu.RLock()
+			if time.Since(q.lastReceiveTime) < 10*time.Second {
+				q.mu.RUnlock()
+				continue
+			}
+			q.mu.RUnlock()
+			logger.Debugf(ctx, "consume beyond lastReceiveTime:%v", q.lastReceiveTime)
+			panic("consume beyond lastReceiveTime")
+			cancel()
+			ctx, cancel = context.WithCancel(ctx)
+			go q.consume(ctx)
 		}
+	}
 
-		if err != nil {
-			logger.Warnf(ctx, "consume failed to read group:%s,err:%v", q.groupName, err)
-			continue
-		}
+}
 
-		for _, msg := range streams[0].Messages {
-			concreteMsgString := msg.Values["m"].(string)
-			concreteMsg, err := clustermessage.ParseAffair([]byte(concreteMsgString))
+func (q *redisQueue) consume(ctx context.Context) {
+	var (
+		queueRedis = q.redisClient
+		logger     = q.opts.Logger
+		topic      = q.opts.Topic
+	)
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Infof(ctx, "consume exit")
+			return
+		default:
+			q.mu.Lock()
+			q.lastReceiveTime = time.Now()
+			q.mu.Unlock()
+			var currentID = ">"
+			streams, err := queueRedis.XReadGroup(ctx, &redis.XReadGroupArgs{
+				Group:    q.groupName,
+				Consumer: q.consumerName,
+				Streams:  []string{string(topic), currentID},
+				Block:    time.Millisecond * 500,
+				Count:    100,
+			}).Result()
+			logger.Debugf(ctx, "consume streams msg length:%v,err:%v", len(streams), err)
+
+			if err == redis.Nil {
+				// Logger.Debugf(Ctx, "consume no msg")
+				continue
+			}
 			if err != nil {
-				logger.Warnf(ctx, "consume failed to decode msg: %s,err:%v", concreteMsgString, err)
+				logger.Warnf(ctx, "consume failed to read group:%s,err:%v", q.groupName, err)
 				continue
 			}
-			if _, ok := q.opts.Handlers[concreteMsg.Type]; !ok {
-				logger.Warnf(ctx, "consume failed to find handler for msg: %s", concreteMsgString)
-				continue
-			}
-			if isAck := q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg); isAck {
-				_, err := queueRedis.XAck(ctx, string(topic), q.groupName, msg.ID).Result()
+
+			for _, msg := range streams[0].Messages {
+				concreteMsgString := msg.Values["m"].(string)
+				concreteMsg, err := clustermessage.ParseAffair([]byte(concreteMsgString))
 				if err != nil {
-					logger.Warnf(ctx, "consume failed to ack msg: %s,err:%v", msg.Values["m"].(string), err)
+					logger.Warnf(ctx, "consume failed to decode msg: %s,err:%v", concreteMsgString, err)
 					continue
 				}
-			} else {
-				logger.Warnf(ctx, "consume msg: %s,not ack", msg.Values["m"].(string))
+				if _, ok := q.opts.Handlers[concreteMsg.Type]; !ok {
+					logger.Warnf(ctx, "consume failed to find handler for msg: %s", concreteMsgString)
+					continue
+				}
+				if isAck := q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg); isAck {
+					_, err := queueRedis.XAck(ctx, string(topic), q.groupName, msg.ID).Result()
+					if err != nil {
+						logger.Warnf(ctx, "consume failed to ack msg: %s,err:%v", msg.Values["m"].(string), err)
+						continue
+					}
+				} else {
+					logger.Warnf(ctx, "consume msg: %s,not ack", msg.Values["m"].(string))
+				}
 			}
 		}
 	}
+
 }
 
 func (q *redisQueue) xTrimLoop(ctx context.Context) {
