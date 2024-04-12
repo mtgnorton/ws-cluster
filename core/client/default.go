@@ -55,9 +55,14 @@ func (c *defaultClient) Send(ctx context.Context, message interface{}) {
 	if c.messageChan == nil {
 		return
 	}
-	c.messageChan <- message
+	select {
+	case <-ctx.Done():
+		return
+	case c.messageChan <- message:
+	default:
 
-	// c.opts.logger.Debugf(ctx, "send message:%v finish", message)
+		c.opts.logger.Debugf(ctx, "client:%s,send message:%v failed", c, message)
+	}
 }
 
 func (c *defaultClient) Close() {
