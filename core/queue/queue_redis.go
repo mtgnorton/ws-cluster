@@ -169,6 +169,7 @@ func (q *redisQueue) consume(ctx context.Context) {
 					logger.Warnf(ctx, "consume failed to find handler for msg: %s", concreteMsgString)
 					continue
 				}
+
 				if isAck := q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg); isAck {
 					_, err := queueRedis.XAck(ctx, string(topic), q.groupName, msg.ID).Result()
 					if err != nil {

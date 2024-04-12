@@ -2,7 +2,6 @@ package clustermessage
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 )
 
@@ -110,7 +109,6 @@ type To struct {
 
 func ParseAffair(bytes []byte) (message *AffairMsg, err error) {
 	message = &AffairMsg{}
-	fmt.Println(string(bytes))
 	err = json.Unmarshal(bytes, message)
 	return
 }
