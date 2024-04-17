@@ -1,11 +1,16 @@
 .PHONY: build
 
 NAME = "ws-cluster"
+
+bkrun: build kill run
+
+krun: kill run
+
 build:
 	go build -o $(NAME) main.go
-
-run:
+kill:
 	kill -9 `ps -ef | grep $(NAME) | grep -v grep | awk '{print $$2}'`;
+run:
 	nohup ./$(NAME) --queue redis  --env dev &
 ps:
 	ps -ef | grep $(NAME)
