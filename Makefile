@@ -2,16 +2,14 @@
 
 NAME = "ws-cluster"
 
-bkrun: build kill run
-
-krun: kill run
-
 build:
 	go build -o $(NAME) main.go
 kill:
 	kill -9 `ps -ef | grep $(NAME) | grep -v grep | awk '{print $$2}'`;
-run:
+run-dev:
 	nohup ./$(NAME) --queue redis  --env dev &
+run-prod:
+	nohup ./$(NAME) --queue redis  --env prod &
 ps:
 	ps -ef | grep $(NAME)
 tail-log:
