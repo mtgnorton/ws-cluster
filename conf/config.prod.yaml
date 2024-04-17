@@ -12,9 +12,9 @@ http_server:
 queue:
   use: redis #t(queue) 队列类型 redis, kafka
   redis:
-    addr: localhost:6389
+    addr: wikitrade-ws-redis.fxeyeinterface.com:6379
     user: ""
-    password: "DCc8XTrXCN57zbcVLhiF"
+    password: ""
     db: 4
   kafka:
     broker: localhost:7093
@@ -28,7 +28,7 @@ log:
   max_backups: 10 # 日志文件最大备份数
   compress: true # 是否压缩日志
 redis:
-  addr: localhost:6389
+  addr: wikitrade-ws-redis.fxeyeinterface.com:6379
   user: ""
   password: ""
   db: 3
