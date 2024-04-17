@@ -196,6 +196,7 @@ func (q *redisQueue) xTrimLoop(ctx context.Context) {
 			c, err := q.redisClient.XTrimMaxLenApprox(ctx, q.opts.Topic, 30000, 500).Result()
 			if err != nil {
 				q.opts.Logger.Warnf(ctx, "xTrimLoop failed to trim err:%v", err)
+				continue
 			}
 			q.opts.Logger.Debugf(ctx, "xTrimLoop trim count:%d", c)
 		}
