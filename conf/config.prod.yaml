@@ -12,9 +12,9 @@ http_server:
 queue:
   use: redis #t(queue) 队列类型 redis, kafka
   redis:
-    addr: wikitrade-ws-redis.fxeyeinterface.com:6379
+    addr: localhost:6389
     user: ""
-    password: ""
+    password: "qwerqwer"
     db: 4
   kafka:
     broker: localhost:7093
