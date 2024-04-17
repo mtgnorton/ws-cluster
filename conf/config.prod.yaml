@@ -12,7 +12,7 @@ http_server:
 queue:
   use: redis #t(queue) 队列类型 redis, kafka
   redis:
-    addr: localhost:6379
+    addr: localhost:6389
     user: ""
     password: "DCc8XTrXCN57zbcVLhiF"
     db: 4
@@ -28,8 +28,7 @@ log:
   max_backups: 10 # 日志文件最大备份数
   compress: true # 是否压缩日志
 redis:
-  addr: localhost:6379
-  port: 6379
+  addr: localhost:6389
   user: ""
   password: ""
   db: 3
