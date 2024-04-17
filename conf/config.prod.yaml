@@ -28,7 +28,8 @@ log:
   max_backups: 10 # 日志文件最大备份数
   compress: true # 是否压缩日志
 redis:
-  addr: wikitrade-ws-redis.fxeyeinterface.com:6379
+  # addr: wikitrade-ws-redis.fxeyeinterface.com:6379
+  addr: localhost:6389
   user: ""
   password: ""
   db: 3
