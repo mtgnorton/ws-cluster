@@ -1,0 +1,56 @@
+# et 代表可以通过环境变量和命令参数覆盖的配置项,命令行参数优先级大于环境变量
+env: prod #et(WS_ENV,env)  local, dev, prod
+node: 100 #et(WS_NODE,node) 节点编号
+router:
+  enable: false # 如果为true，会向路由服务地址发起注册请求
+  addr: http://localhost:9696/register #t(router_addr) 路由服务地址
+  out_host: localhost #t(self_addr) 本机对外服务地址,用于注册到路由服务,最后的注册地址为 ws://{self_addr}:{ws_port}/connect
+ws_server:
+  port: 8084 #t(ws_port) websocket服务端口
+http_server:
+  port: 8085 #t(http_port) http服务端口
+queue:
+  use: redis #t(queue) 队列类型 redis, kafka
+  redis:
+    addr: localhost:6379
+    user: ""
+    password: "DCc8XTrXCN57zbcVLhiF"
+    db: 4
+  kafka:
+    broker: localhost:7093
+    version: 3.2.0
+log:
+  path: logs
+  print: true # 是否打印日志
+  level: debug # 日志级别 debug, info, warn, error,dpanic, panic, fatal
+  max_age: 7 # 日志保存天数
+  max_size: 100 # 单个日志文件大小，单位MB
+  max_backups: 10 # 日志文件最大备份数
+  compress: true # 是否压缩日志
+redis:
+  addr: localhost:6379
+  port: 6379
+  user: ""
+  password: ""
+  db: 3
+
+jwt:
+  secret: secret
+  expire: 36000000
+sentry: # 如果dsn为空，则不启用sentry
+  dsn: ""
+  # dsn: "https://51da076279386f0174c2d3237aeb657e@o4506597786517504.ingest.sentry.io/4506597788614656"
+  traces_sample_rate: 1.0
+#通过docker-compose启动， prometheus的web访问地址为 http://localhost:9092，grafana的web访问地址为 http://localhost:3000,user: admin,password: grafana
+prometheus:
+  enable: false
+  path: /metrics
+  addr: :9091
+pprof:
+  enable: false
+  port: 6060
+swagger:
+  enable: false
+  path: /swagger
+  port: 9092
+
