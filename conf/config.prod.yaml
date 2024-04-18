@@ -13,7 +13,7 @@ queue:
   use: redis #t(queue) 队列类型 redis, kafka
   redis:
     addr: localhost:6389
-    user: ""
+    user: "default"
     password: "qwerqwer"
     db: 4
   kafka:
