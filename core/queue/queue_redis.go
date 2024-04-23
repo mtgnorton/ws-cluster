@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgnorton/ws-cluster/shared"
+
 	"github.com/sasha-s/go-deadlock"
 
 	"github.com/go-redis/redis/v8"
@@ -130,56 +132,72 @@ func (q *redisQueue) consume(ctx context.Context) {
 		logger     = q.opts.Logger
 		topic      = q.opts.Topic
 	)
+
+	f := func() {
+
+		beginTime := time.Now()
+		q.mu.Lock()
+		q.lastReceiveTime = time.Now()
+		q.mu.Unlock()
+
+		var currentID = ">"
+		streams, err := queueRedis.XReadGroup(ctx, &redis.XReadGroupArgs{
+			Group:    q.groupName,
+			Consumer: q.consumerName,
+			Streams:  []string{string(topic), currentID},
+			Block:    time.Millisecond * 500,
+			Count:    100,
+		}).Result()
+
+		logger.Debugf(ctx, "consume streams msg length:%v,err:%v", len(streams[0].Messages), err)
+
+		if err == redis.Nil {
+			// Logger.Debugf(Ctx, "consume no msg")
+			return
+		}
+		if err != nil {
+			logger.Warnf(ctx, "consume failed to read group:%s,err:%v", q.groupName, err)
+			return
+		}
+
+		end := shared.TimeoutDetection.Do(time.Second*3, func() {
+			logger.Errorf(ctx, "consume execute  timeout,msg:%+v", streams[0].Messages)
+		})
+		defer func() {
+			end()
+			logger.Infof(ctx, "consume exec time %v", time.Since(beginTime))
+		}()
+
+		for _, msg := range streams[0].Messages {
+			concreteMsgString := msg.Values["m"].(string)
+			concreteMsg, err := clustermessage.ParseAffair([]byte(concreteMsgString))
+			if err != nil {
+				logger.Warnf(ctx, "consume failed to decode msg: %s,err:%v", concreteMsgString, err)
+				continue
+			}
+			if _, ok := q.opts.Handlers[concreteMsg.Type]; !ok {
+				logger.Warnf(ctx, "consume failed to find handler for msg: %s", concreteMsgString)
+				continue
+			}
+
+			if isAck := q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg); isAck {
+				_, err := queueRedis.XAck(ctx, string(topic), q.groupName, msg.ID).Result()
+				if err != nil {
+					logger.Warnf(ctx, "consume failed to ack msg: %s,err:%v", msg.Values["m"].(string), err)
+					continue
+				}
+			} else {
+				logger.Warnf(ctx, "consume msg: %s,not ack", msg.Values["m"].(string))
+			}
+		}
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Infof(ctx, "consume exit")
 			return
 		default:
-			q.mu.Lock()
-			q.lastReceiveTime = time.Now()
-			q.mu.Unlock()
-			var currentID = ">"
-			streams, err := queueRedis.XReadGroup(ctx, &redis.XReadGroupArgs{
-				Group:    q.groupName,
-				Consumer: q.consumerName,
-				Streams:  []string{string(topic), currentID},
-				Block:    time.Millisecond * 500,
-				Count:    100,
-			}).Result()
-			logger.Debugf(ctx, "consume streams msg length:%v,err:%v", len(streams), err)
-
-			if err == redis.Nil {
-				// Logger.Debugf(Ctx, "consume no msg")
-				continue
-			}
-			if err != nil {
-				logger.Warnf(ctx, "consume failed to read group:%s,err:%v", q.groupName, err)
-				continue
-			}
-
-			for _, msg := range streams[0].Messages {
-				concreteMsgString := msg.Values["m"].(string)
-				concreteMsg, err := clustermessage.ParseAffair([]byte(concreteMsgString))
-				if err != nil {
-					logger.Warnf(ctx, "consume failed to decode msg: %s,err:%v", concreteMsgString, err)
-					continue
-				}
-				if _, ok := q.opts.Handlers[concreteMsg.Type]; !ok {
-					logger.Warnf(ctx, "consume failed to find handler for msg: %s", concreteMsgString)
-					continue
-				}
-
-				if isAck := q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg); isAck {
-					_, err := queueRedis.XAck(ctx, string(topic), q.groupName, msg.ID).Result()
-					if err != nil {
-						logger.Warnf(ctx, "consume failed to ack msg: %s,err:%v", msg.Values["m"].(string), err)
-						continue
-					}
-				} else {
-					logger.Warnf(ctx, "consume msg: %s,not ack", msg.Values["m"].(string))
-				}
-			}
+			f()
 		}
 	}
 
