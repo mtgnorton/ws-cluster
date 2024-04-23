@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/shared"
-
 	"github.com/sasha-s/go-deadlock"
 
 	"github.com/go-redis/redis/v8"
@@ -111,7 +109,7 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 		select {
 		case <-ticker.C:
 			q.mu.RLock()
-			if time.Since(q.lastReceiveTime) < 10*time.Second {
+			if time.Since(q.lastReceiveTime) < 20*time.Second {
 				q.mu.RUnlock()
 				continue
 			}
@@ -145,8 +143,8 @@ func (q *redisQueue) consume(ctx context.Context) {
 			Group:    q.groupName,
 			Consumer: q.consumerName,
 			Streams:  []string{string(topic), currentID},
-			Block:    time.Millisecond * 500,
-			Count:    100,
+			Block:    time.Millisecond * 100,
+			Count:    50,
 		}).Result()
 
 		logger.Debugf(ctx, "Redis-Consume streams msg length:%v,err:%v", len(streams[0].Messages), err)
@@ -160,11 +158,11 @@ func (q *redisQueue) consume(ctx context.Context) {
 			return
 		}
 
-		end := shared.TimeoutDetection.Do(time.Second*3, func() {
-			logger.Errorf(ctx, "Redis-Consume execut  timeout,msg:%+v", streams[0].Messages)
-		})
+		//end := shared.TimeoutDetection.Do(time.Second*3, func() {
+		//	logger.Errorf(ctx, "Redis-Consume execut  timeout,msg:%+v", streams[0].Messages)
+		//})
 		defer func() {
-			end()
+			//end()
 			logger.Infof(ctx, "Redis-Consume e msg length:%v, exec time %v", len(streams[0].Messages), time.Since(beginTime))
 		}()
 
