@@ -3,7 +3,9 @@
 NAME = "ws-cluster"
 
 build:
-	go build -o $(NAME) main.go
+	go build -x -o $(NAME) main.go
+build-linux:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -x -o $(NAME) main.go
 kill:
 	kill -9 `ps -ef | grep $(NAME) | grep -v grep | awk '{print $$2}'`;
 run-dev:
