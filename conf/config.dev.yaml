@@ -12,10 +12,9 @@ http_server:
 queue:
   use: redis #t(queue) 队列类型 redis, kafka
   redis:
-    addr: localhost:6379
-    port:
-    user: ""
-    password: ""
+    addr: localhost:6389
+    user: "default"
+    password: "qwerqwer"
     db: 4
   kafka:
     broker: localhost:7093

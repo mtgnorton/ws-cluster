@@ -2,6 +2,9 @@ package handler
 
 import (
 	"context"
+	"time"
+
+	"github.com/mtgnorton/ws-cluster/shared"
 
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 )
@@ -20,6 +23,12 @@ type SendToUserMessage struct {
 func (h *ServerHandler) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
 	logger, manager, isAck := h.opts.logger, h.opts.manager, true
 	pid, uids, cids := msg.To.PID, msg.To.UIDs, msg.To.CIDs
+
+	end := shared.TimeoutDetection.Do(time.Second*3, func() {
+		logger.Errorf(ctx, "ServerHandler Handle msg timeout,msg:%+v", msg)
+	})
+	defer end()
+
 	if pid == "" {
 		logger.Infof(ctx, "push msg pid is empty,msg:%+v", msg)
 		return
