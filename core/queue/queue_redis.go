@@ -39,7 +39,7 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 		opts:         options,
 		redisClient:  redisClient,
 		groupName:    "group-" + fmt.Sprint(options.Config.Values().Node),
-		consumerName: "consumer-" + fmt.Sprint(options.Config.Values().Node),
+		consumerName: "Redis-Consumer-" + fmt.Sprint(options.Config.Values().Node),
 	}
 }
 
@@ -76,7 +76,7 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 	)
 	r1, err := queueRedis.XGroupCreateMkStream(ctx, topic, q.groupName, "$").Result()
 	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
-		logger.Warnf(ctx, "consume failed to create group:%s,err:%v", q.groupName, err)
+		logger.Warnf(ctx, "Redis-Consume failed to create group:%s,err:%v", q.groupName, err)
 		return err
 	}
 	logger.Debugf(ctx, "create group:%s,rs:%v,err:%v", q.groupName, r1, err)
@@ -94,7 +94,7 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 		logger.Debugf(ctx, "mark lastMessages msg:%v", lastMessages[0].ID)
 		_, err = queueRedis.XGroupSetID(ctx, topic, q.groupName, lastMessages[0].ID).Result()
 		if err != nil {
-			logger.Warnf(ctx, "consume failed to ack lastMessages msg:%s,err:%v", lastMessages[0].ID, err)
+			logger.Warnf(ctx, "Redis-Consume failed to ack lastMessages msg:%s,err:%v", lastMessages[0].ID, err)
 			return err
 		}
 	}
@@ -116,8 +116,8 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 				continue
 			}
 			q.mu.RUnlock()
-			logger.Debugf(ctx, "consume beyond lastReceiveTime:%v", q.lastReceiveTime)
-			panic("consume beyond lastReceiveTime")
+			logger.Debugf(ctx, "Redis-Consume beyond lastReceiveTime:%v", q.lastReceiveTime)
+			panic("Redis-Consume beyond lastReceiveTime")
 			cancel()
 			ctx, cancel = context.WithCancel(ctx)
 			go q.consume(ctx)
@@ -149,52 +149,52 @@ func (q *redisQueue) consume(ctx context.Context) {
 			Count:    100,
 		}).Result()
 
-		logger.Debugf(ctx, "consume streams msg length:%v,err:%v", len(streams[0].Messages), err)
+		logger.Debugf(ctx, "Redis-Consume streams msg length:%v,err:%v", len(streams[0].Messages), err)
 
 		if err == redis.Nil {
-			// Logger.Debugf(Ctx, "consume no msg")
+			// Logger.Debugf(Ctx, "Redis-Consume no msg")
 			return
 		}
 		if err != nil {
-			logger.Warnf(ctx, "consume failed to read group:%s,err:%v", q.groupName, err)
+			logger.Warnf(ctx, "Redis-Consume failed to read group:%s,err:%v", q.groupName, err)
 			return
 		}
 
 		end := shared.TimeoutDetection.Do(time.Second*3, func() {
-			logger.Errorf(ctx, "consume execut  timeout,msg:%+v", streams[0].Messages)
+			logger.Errorf(ctx, "Redis-Consume execut  timeout,msg:%+v", streams[0].Messages)
 		})
 		defer func() {
 			end()
-			logger.Infof(ctx, "consume e msg length:%v, exec time %v", len(streams[0].Messages), time.Since(beginTime))
+			logger.Infof(ctx, "Redis-Consume e msg length:%v, exec time %v", len(streams[0].Messages), time.Since(beginTime))
 		}()
 
 		for _, msg := range streams[0].Messages {
 			concreteMsgString := msg.Values["m"].(string)
 			concreteMsg, err := clustermessage.ParseAffair([]byte(concreteMsgString))
 			if err != nil {
-				logger.Warnf(ctx, "consume failed to decode msg: %s,err:%v", concreteMsgString, err)
+				logger.Warnf(ctx, "Redis-Consume failed to decode msg: %s,err:%v", concreteMsgString, err)
 				continue
 			}
 			if _, ok := q.opts.Handlers[concreteMsg.Type]; !ok {
-				logger.Warnf(ctx, "consume failed to find handler for msg: %s", concreteMsgString)
+				logger.Warnf(ctx, "Redis-Consume failed to find handler for msg: %s", concreteMsgString)
 				continue
 			}
 
 			if isAck := q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg); isAck {
 				_, err := queueRedis.XAck(ctx, string(topic), q.groupName, msg.ID).Result()
 				if err != nil {
-					logger.Warnf(ctx, "consume failed to ack msg: %s,err:%v", msg.Values["m"].(string), err)
+					logger.Warnf(ctx, "Redis-Consume failed to ack msg: %s,err:%v", msg.Values["m"].(string), err)
 					continue
 				}
 			} else {
-				logger.Warnf(ctx, "consume msg: %s,not ack", msg.Values["m"].(string))
+				logger.Warnf(ctx, "Redis-Consume msg: %s,not ack", msg.Values["m"].(string))
 			}
 		}
 	}
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Infof(ctx, "consume exit")
+			logger.Infof(ctx, "Redis-Consume exit")
 			return
 		default:
 			f()
