@@ -161,11 +161,11 @@ func (q *redisQueue) consume(ctx context.Context) {
 		}
 
 		end := shared.TimeoutDetection.Do(time.Second*3, func() {
-			logger.Errorf(ctx, "consume execute  timeout,msg:%+v", streams[0].Messages)
+			logger.Errorf(ctx, "consume execut  timeout,msg:%+v", streams[0].Messages)
 		})
 		defer func() {
 			end()
-			logger.Infof(ctx, "consume exec time %v", time.Since(beginTime))
+			logger.Infof(ctx, "consume e msg length:%v, exec time %v", len(streams[0].Messages), time.Since(beginTime))
 		}()
 
 		for _, msg := range streams[0].Messages {
