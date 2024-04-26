@@ -143,11 +143,13 @@ func (q *redisQueue) consume(ctx context.Context) {
 			Group:    q.groupName,
 			Consumer: q.consumerName,
 			Streams:  []string{string(topic), currentID},
-			Block:    time.Millisecond * 100,
-			Count:    50,
+			Block:    time.Millisecond * 10,
+			Count:    100,
 		}).Result()
 
-		logger.Debugf(ctx, "Redis-Consume streams msg length:%v,err:%v", len(streams[0].Messages), err)
+		if len(streams) > 1 {
+			logger.Debugf(ctx, "Redis-Consume streams msg length:%v,err:%v", len(streams[0].Messages), err)
+		}
 
 		if err == redis.Nil {
 			// Logger.Debugf(Ctx, "Redis-Consume no msg")
@@ -163,7 +165,7 @@ func (q *redisQueue) consume(ctx context.Context) {
 		//})
 		defer func() {
 			//end()
-			logger.Infof(ctx, "Redis-Consume e msg length:%v, exec time %v", len(streams[0].Messages), time.Since(beginTime))
+			logger.Infof(ctx, "Redis-Consume  msg length:%v, exec time %v ms", len(streams[0].Messages), time.Since(beginTime).Milliseconds())
 		}()
 
 		for _, msg := range streams[0].Messages {
@@ -202,19 +204,22 @@ func (q *redisQueue) consume(ctx context.Context) {
 }
 
 func (q *redisQueue) xTrimLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(time.Second * 1)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			c, err := q.redisClient.XTrimMaxLenApprox(ctx, q.opts.Topic, 30000, 500).Result()
+			beginTime := time.Now()
+			c, err := q.redisClient.XTrimMaxLenApprox(ctx, q.opts.Topic, 30000, 5000).Result()
 			if err != nil {
 				q.opts.Logger.Warnf(ctx, "xTrimLoop failed to trim err:%v", err)
 				continue
 			}
-			q.opts.Logger.Debugf(ctx, "xTrimLoop trim count:%d", c)
+			xLen := q.redisClient.XLen(ctx, q.opts.Topic).Val()
+
+			q.opts.Logger.Debugf(ctx, "xTrimLoop trim count:%d,remain %d,consume :%v ms", c, xLen, time.Since(beginTime).Milliseconds())
 		}
 	}
 }

@@ -79,7 +79,7 @@ func (z ZapLogger) Panicf(ctx context.Context, template string, args ...interfac
 }
 
 func newZapLogger(config config.Config) *zap.SugaredLogger {
-	writer := simpleWriter(config)
+	writer := partitionWriter(config)
 	// errorWriter := errorWriter(config)
 
 	encoder := encoder()
