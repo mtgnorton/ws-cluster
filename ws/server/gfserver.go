@@ -166,8 +166,8 @@ func (s *gfServer) RegisterToRegistryLoop() {
 func (s *gfServer) addMetrics() {
 	// prometheus add metrics
 	p := s.opts.prometheus
-	_ = p.GetAdd(wsprometheus.MetricRequestTotal, nil, 1)
-	_ = p.GetAdd(wsprometheus.MetricRequestURLTotal, []string{"ws", "200"}, 1)
+	//_ = p.GetAdd(wsprometheus.MetricRequestTotal, nil, 1)
+	//_ = p.GetAdd(wsprometheus.MetricRequestURLTotal, []string{"ws", "200"}, 1)
 	_ = p.GetAdd(wsprometheus.MetricWsConnection, nil, 1)
 
 }

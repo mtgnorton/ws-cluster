@@ -12,6 +12,9 @@ const (
 	MetricRequestURLTotal = "request_url_total"
 	MetricRequestDuration = "request_duration"
 	MetricWsConnection    = "ws_connection"
+
+	MetricQueueHandleDuration = "queue_handle_duration"
+	MetricQueueHandleTotal    = "queue_handle_total"
 )
 
 var DefaultPrometheus = New()
@@ -77,6 +80,20 @@ func (p *Prometheus) init() {
 		Type:        Gauge,
 		Name:        MetricWsConnection,
 		Description: "current ws connection num.",
+	})
+
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Histogram,
+		Name:        MetricQueueHandleDuration,
+		Description: "queue handle msg duration.",
+		Labels:      []string{"queue_type"},
+		Buckets:     []float64{10, 30, 60, 100, 200, 500, 1000},
+	})
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Counter,
+		Name:        MetricQueueHandleTotal,
+		Description: "queue handle msg  num",
+		Labels:      []string{"queue_type"},
 	})
 
 	http.Handle(p.opts.Config.Values().Prometheus.Path, promhttp.Handler())
