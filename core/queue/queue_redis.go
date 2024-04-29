@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
+
 	"github.com/sasha-s/go-deadlock"
 
 	"github.com/go-redis/redis/v8"
@@ -57,12 +59,17 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 		// q.opts.Logger.Debugf(ctx, "publish topic:%s,m:%s", topic, messageBytes)
 	}
 
-	return q.redisClient.XAdd(ctx, &redis.XAddArgs{
+	err = q.redisClient.XAdd(ctx, &redis.XAddArgs{
 		Stream: string(topic),
 		Values: map[string]interface{}{
 			"m": string(messageBytes),
 		},
 	}).Err()
+	if err != nil {
+		q.opts.Logger.Warnf(ctx, "Redis-Publish failed to publish msg:%s,err:%v", messageBytes, err)
+		return err
+	}
+	return nil
 }
 
 // Consume 开启一个协程，不断地从redis中读取消息
@@ -129,6 +136,7 @@ func (q *redisQueue) consume(ctx context.Context) {
 		queueRedis = q.redisClient
 		logger     = q.opts.Logger
 		topic      = q.opts.Topic
+		p          = q.opts.Prometheus
 	)
 
 	f := func() {
@@ -166,6 +174,14 @@ func (q *redisQueue) consume(ctx context.Context) {
 		defer func() {
 			//end()
 			logger.Infof(ctx, "Redis-Consume  msg length:%v, exec time %v ms", len(streams[0].Messages), time.Since(beginTime).Milliseconds())
+
+			averageTime := time.Since(beginTime).Milliseconds() / int64(len(streams[0].Messages))
+			if averageTime == 0 {
+				averageTime = 1
+			}
+			_ = p.GetObserve(wsprometheus.MetricQueueHandleDuration, []string{topic}, float64(averageTime))
+
+			_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueHandleTotal, []string{"redis"}, float64(len(streams[0].Messages)))
 		}()
 
 		for _, msg := range streams[0].Messages {

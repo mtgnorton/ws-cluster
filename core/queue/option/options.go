@@ -3,6 +3,8 @@ package option
 import (
 	"context"
 
+	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
+
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/queue/qtype"
 
@@ -14,22 +16,24 @@ import (
 )
 
 type Options struct {
-	Ctx      context.Context
-	Config   config.Config
-	Topic    string
-	Logger   logger.Logger
-	Handlers map[clustermessage.Type]handler.Handle
+	Ctx        context.Context
+	Config     config.Config
+	Topic      string
+	Logger     logger.Logger
+	Handlers   map[clustermessage.Type]handler.Handle
+	Prometheus *wsprometheus.Prometheus
 }
 
 type Option func(*Options)
 
 func NewOptions(opts ...Option) Options {
 	options := Options{
-		Ctx:      context.Background(),
-		Config:   config.DefaultConfig,
-		Topic:    qtype.TopicDefault,
-		Logger:   logger.DefaultLogger,
-		Handlers: make(map[clustermessage.Type]handler.Handle),
+		Ctx:        context.Background(),
+		Config:     config.DefaultConfig,
+		Topic:      qtype.TopicDefault,
+		Logger:     logger.DefaultLogger,
+		Handlers:   make(map[clustermessage.Type]handler.Handle),
+		Prometheus: wsprometheus.DefaultPrometheus,
 	}
 
 	userHandler := handler.NewUserHandler()
