@@ -12,7 +12,7 @@ func Test_Encode(t *testing.T) {
 		ClientType: 0,
 	})
 	fmt.Println(r)
-	r = "xhgZjcBLZ25e_sZO_71JmQ"
+	r = "hhV4m8A27TRcSAAxcws5YA"
 	user, err := Decode(r)
 	if err != nil {
 		t.Error(err)

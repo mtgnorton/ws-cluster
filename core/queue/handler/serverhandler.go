@@ -54,7 +54,7 @@ func (h *ServerHandler) Handle(ctx context.Context, msg *clustermessage.AffairMs
 		logger.Debugf(ctx, "push msg not found client,msg:%+v", msg)
 		return
 	}
-
+	logger.Debugf(ctx, "send msg to clients:%+v,msg:%+v", finalClients, msg)
 	for _, client := range finalClients {
 		client.Send(ctx, SendToUserMessage{
 			AffairID: msg.AffairID,

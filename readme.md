@@ -1,4 +1,5 @@
 ## 功能
+
 1. ws 集群
 2. 使用 pprof 进行性能分析
    pprof 当启动http服务时，如果设置pprof开启，那么pprof会伴随启动，假设服务运行在 6060
@@ -20,7 +21,8 @@
    地址： https://docs.sentry.io/
 
 ## 使用
-./ws-cluster --node 200 --ws_port 8812 --http_port 8912 --queue redis  --env dev
+
+./ws-cluster --node 200 --ws_port 8812 --http_port 8912 --queue redis --env dev
 
 ## 流程
 
@@ -31,12 +33,15 @@
 3. 所有服务端消费消息队列中的数据,如果确定对应的用户在自己的服务端上,将数据发送到客户端
 
 ## todo
+
 1. 接口文档
-2. 负载均衡
+2. 负载均衡router
 3. 日志切割导致日志丢失的问题
 4. http接口
-5. redis队列读取阻塞问题
-
+5. ~~redis队列读取阻塞问题~~
+6. 设备类型上传
+7. 压力测试
+8. 集成openTelemetry 
 
 ### 客户端：
 
@@ -51,13 +56,12 @@
      client_id(客户端 id)
    ```
 2. ws消息：
-   - 客户端：
-     ```
-     请求参数
-      type: subscribe(订阅)
-      tags: 标签
-     ```
-   
+    - 客户端：
+      ```
+      请求参数
+       type: subscribe(订阅)
+       tags: 标签
+      ```
 
 ### 业务系统：
 
