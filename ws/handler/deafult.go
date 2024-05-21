@@ -68,7 +68,7 @@ func (w *WsHandler) Server(ctx context.Context, c client.Client, msg *clustermes
 		logger.Infof(ctx, "WsHandler-push server publish error %v", err)
 		return
 	}
-	logger.Debugf(ctx, "Push to Queue server msg  success,msg:%+v", msg)
+	logger.Debugf(ctx, "Push to Queue server msg  success,msg:%+v,To:%+v", msg, msg.To)
 	if msg.AckID != "" {
 		c.Send(ctx, clustermessage.NewAck(msg.AckID))
 	}
