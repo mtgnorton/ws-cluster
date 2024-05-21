@@ -43,7 +43,7 @@ sentry: # 如果dsn为空，则不启用sentry
   traces_sample_rate: 1.0
 #通过docker-compose启动， prometheus的web访问地址为 http://localhost:9092，grafana的web访问地址为 http://localhost:3000,user: admin,password: grafana
 prometheus:
-  enable: false
+  enable: true
   path: /metrics
   addr: :9091
 pprof:

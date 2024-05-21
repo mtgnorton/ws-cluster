@@ -12,6 +12,9 @@ services:
       - prom_data:/prometheus
     networks:
       - prometheus-grafana
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   grafana:
     image: grafana/grafana
     container_name: grafana
@@ -25,7 +28,8 @@ services:
       - ./grafana:/etc/grafana/provisioning/datasources
     networks:
       - prometheus-grafana
-
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 #    user: root
 volumes:
   prom_data:

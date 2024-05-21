@@ -18,7 +18,7 @@ func NewWsHandler(opts ...Option) *WsHandler {
 	}
 }
 func (w *WsHandler) Handle(ctx context.Context, c client.Client, msg *clustermessage.AffairMsg) {
-	w.opts.logger.Debugf(ctx, "Receive msg %+v", msg)
+	//w.opts.logger.Debugf(ctx, "Receive msg %+v", msg)
 	// 管理端: 所有消息类型
 	// 服务端: 推送
 	// 用户端: 请求
@@ -68,7 +68,7 @@ func (w *WsHandler) Server(ctx context.Context, c client.Client, msg *clustermes
 		logger.Infof(ctx, "WsHandler-push server publish error %v", err)
 		return
 	}
-	logger.Debugf(ctx, "PushQueue server  success,msg:%v", msg)
+	logger.Debugf(ctx, "Push to Queue server msg  success,msg:%+v", msg)
 	if msg.AckID != "" {
 		c.Send(ctx, clustermessage.NewAck(msg.AckID))
 	}
@@ -88,7 +88,7 @@ func (w *WsHandler) User(ctx context.Context, c client.Client, msg *clustermessa
 		w.opts.logger.Infof(ctx, "WsHandler-request user publish error %v", err)
 		return
 	}
-	w.opts.logger.Debugf(ctx, "PushQueue user  success,msg:%v", msg)
+	w.opts.logger.Debugf(ctx, "Push to Queue user msg  success,msg:%v", msg)
 	if msg.AckID != "" {
 		c.Send(ctx, clustermessage.NewAck(msg.AckID))
 	}
