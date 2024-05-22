@@ -28,7 +28,7 @@ func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg
 	)
 	isAck = true
 	end := shared.TimeoutDetection.Do(time.Second*3, func() {
-		logger.Errorf(ctx, "SendToServer Handle msg timeout,msg:%+v", msg)
+		logger.Errorf(ctx, "SendToServer  msg timeout,msg:%+v", msg)
 	})
 	defer end()
 
@@ -36,7 +36,7 @@ func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg
 		return
 	}
 	servers := manager.ServersByPID(ctx, msg.Source.PID)
-	logger.Debugf(ctx, "Send to server msg:%+v, servers:%+v", msg, servers)
+	logger.Debugf(ctx, "SendToServer msg:%+v, servers:%+v", msg, servers)
 	if len(servers) == 0 {
 		return
 	}
