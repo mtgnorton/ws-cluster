@@ -13,8 +13,9 @@ const (
 	TypeConnect    Type = "connect"
 	TypeDisconnect Type = "disconnect"
 
-	TypeReport Type = "report" // 用户端上报设备信息,该信息会保存到ws集群中
-	TypeHeart  Type = "heart"
+	TypeOnlineClients Type = "online_clients"
+	TypeReport        Type = "report" // 用户端上报设备信息,该信息会保存到ws集群中
+	TypeHeart         Type = "heart"
 )
 
 // AffairMsg 为用户端，ws集群，业务服务端之间传递的消息结构

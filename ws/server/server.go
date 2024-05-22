@@ -8,5 +8,5 @@ type Server interface {
 	Options() Options
 	Run()
 	Stop() error
-	RegisterToRegistryLoop()
+	registerToRegistryLoop()
 }

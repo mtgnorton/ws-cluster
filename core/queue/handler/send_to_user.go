@@ -9,8 +9,8 @@ import (
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 )
 
-// ServerHandler 从消息队列接收到业务服务端的消息，将其转发给用户端
-type ServerHandler struct {
+// SendToUser 从消息队列接收到业务服务端的消息，将其转发给用户端
+type SendToUser struct {
 	opts *Options
 }
 
@@ -20,12 +20,12 @@ type SendToUserMessage struct {
 	Payload  interface{} `json:"payload,omitempty"`
 }
 
-func (h *ServerHandler) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
+func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
 	logger, manager, isAck := h.opts.logger, h.opts.manager, true
 	pid, uids, cids := msg.To.PID, msg.To.UIDs, msg.To.CIDs
 
 	end := shared.TimeoutDetection.Do(time.Second*3, func() {
-		logger.Errorf(ctx, "ServerHandler Handle msg timeout,msg:%+v", msg)
+		logger.Errorf(ctx, "SendToUser Handle msg timeout,msg:%+v", msg)
 	})
 	defer end()
 
@@ -65,7 +65,7 @@ func (h *ServerHandler) Handle(ctx context.Context, msg *clustermessage.AffairMs
 }
 
 func NewServerHandler(opts ...Option) Handle {
-	return &ServerHandler{
+	return &SendToUser{
 		opts: NewOptions(opts...),
 	}
 }

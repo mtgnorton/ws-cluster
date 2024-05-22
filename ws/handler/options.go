@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/mtgnorton/ws-cluster/config"
 	"github.com/mtgnorton/ws-cluster/core/manager"
 	"github.com/mtgnorton/ws-cluster/core/queue"
@@ -10,6 +12,7 @@ import (
 type Option func(*Options)
 
 type Options struct {
+	ctx     context.Context
 	manager manager.Manager
 	logger  logger.Logger
 	queue   queue.Queue
@@ -17,6 +20,7 @@ type Options struct {
 
 func NewOptions(opts ...Option) *Options {
 	options := &Options{
+		ctx:     context.Background(),
 		manager: manager.DefaultManager,
 		logger:  logger.DefaultLogger,
 		queue:   queue.GetQueueInstance(config.DefaultConfig),
@@ -25,6 +29,11 @@ func NewOptions(opts ...Option) *Options {
 		o(options)
 	}
 	return options
+}
+func WithContext(ctx context.Context) Option {
+	return func(o *Options) {
+		o.ctx = ctx
+	}
 }
 
 func WithManager(m manager.Manager) Option {

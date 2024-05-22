@@ -17,6 +17,7 @@ func NewWsHandler(opts ...Option) *WsHandler {
 		opts: options,
 	}
 }
+
 func (w *WsHandler) Handle(ctx context.Context, c client.Client, msg *clustermessage.AffairMsg) {
 	//w.opts.logger.Debugf(ctx, "Receive msg %+v", msg)
 	// 管理端: 所有消息类型
@@ -33,7 +34,7 @@ func (w *WsHandler) Handle(ctx context.Context, c client.Client, msg *clustermes
 		if c.Type() != client.CTypeUser {
 			return
 		}
-		w.User(ctx, c, msg)
+		w.handleMsgFromUser(ctx, c, msg)
 		return
 	}
 
@@ -41,16 +42,16 @@ func (w *WsHandler) Handle(ctx context.Context, c client.Client, msg *clustermes
 	switch c.Type() {
 	case client.CTypeUser:
 		msg.Type = clustermessage.TypeRequest
-		w.User(ctx, c, msg)
+		w.handleMsgFromUser(ctx, c, msg)
 	case client.CTypeServer:
 		msg.Type = clustermessage.TypePush
-		w.Server(ctx, c, msg)
+		w.handleMsgFromServer(ctx, c, msg)
 	}
 
 }
 
-// Server 来自Server端消息封装
-func (w *WsHandler) Server(ctx context.Context, c client.Client, msg *clustermessage.AffairMsg) {
+// handleMsgFromServer 来自Server端消息封装
+func (w *WsHandler) handleMsgFromServer(ctx context.Context, c client.Client, msg *clustermessage.AffairMsg) {
 
 	var (
 		logger = w.opts.logger
@@ -58,7 +59,7 @@ func (w *WsHandler) Server(ctx context.Context, c client.Client, msg *clustermes
 	)
 	// 如果没有传递到的用户，直接返回
 	if len(msg.To.CIDs) == 0 && len(msg.To.UIDs) == 0 {
-		logger.Infof(ctx, "WsHandler-Server msg.To is empty")
+		logger.Infof(ctx, "WsHandler-handleMsgFromServer msg.To is empty")
 		return
 	}
 	_, _, msg.To.PID = c.GetIDs()
@@ -75,8 +76,8 @@ func (w *WsHandler) Server(ctx context.Context, c client.Client, msg *clustermes
 
 }
 
-// User 来自用户端消息封装
-func (w *WsHandler) User(ctx context.Context, c client.Client, msg *clustermessage.AffairMsg) {
+// handleMsgFromUser 来自用户端消息封装
+func (w *WsHandler) handleMsgFromUser(ctx context.Context, c client.Client, msg *clustermessage.AffairMsg) {
 	cid, uid, pid := c.GetIDs()
 	msg.Source = &clustermessage.Source{
 		PID: pid,

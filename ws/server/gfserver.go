@@ -54,8 +54,9 @@ func (s *gfServer) Run() {
 	s.server.SetPort(s.opts.port)
 
 	if s.opts.config.Values().Router.Enable {
-		go s.RegisterToRegistryLoop()
+		go s.registerToRegistryLoop()
 	}
+	go s.sendClientsLoop()
 
 	s.server.Run()
 
@@ -129,7 +130,7 @@ func (s *gfServer) connect(r *ghttp.Request) {
 	}
 }
 
-func (s *gfServer) RegisterToRegistryLoop() {
+func (s *gfServer) registerToRegistryLoop() {
 	routerAddr := s.opts.config.Values().Router.Addr
 	if routerAddr == "" {
 		return
@@ -160,7 +161,40 @@ func (s *gfServer) RegisterToRegistryLoop() {
 		// s.opts.logger.Infof(ctx, "register to router response:%s", content)
 		cancel()
 	}
+}
 
+// sendClientsLoop 定时推送用户端的连接信息
+func (s *gfServer) sendClientsLoop() {
+	var (
+		ctx = s.opts.ctx
+	)
+	for range time.Tick(2 * time.Second) {
+		// 获取所有的用户端的连接信息
+		// 遍历所有的服务端
+		// 发送给服务端
+		for _, projectServerClients := range s.opts.manager.Projects(ctx) {
+			cids := make([]string, 0)
+			for _, c := range projectServerClients.Clients {
+				cid, _, _ := c.GetIDs()
+				cids = append(cids, cid)
+			}
+			msg := clustermessage.AffairMsg{
+				AffairID: "",
+				AckID:    "",
+				Payload:  cids,
+				Type:     clustermessage.TypeOnlineClients,
+				Source:   nil,
+				To: &clustermessage.To{
+					PID:  projectServerClients.PID,
+					UIDs: nil,
+					CIDs: nil,
+				},
+			}
+			for _, s := range projectServerClients.Servers {
+				s.Send(ctx, &msg)
+			}
+		}
+	}
 }
 
 func (s *gfServer) addMetrics() {

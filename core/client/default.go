@@ -108,7 +108,7 @@ func (c *defaultClient) Type() CType {
 }
 
 func (c *defaultClient) String() string {
-	return fmt.Sprintf("User[ID:%s,UID:%s,PID:%s,Type:%s]", c.ID, c.UID, c.PID, c.cType)
+	return fmt.Sprintf("handleMsgFromUser[ID:%s,UID:%s,PID:%s,Type:%s]", c.ID, c.UID, c.PID, c.cType)
 }
 
 func (c *defaultClient) sendLoop(ctx context.Context) {
