@@ -9,8 +9,8 @@ import (
 	"github.com/mtgnorton/ws-cluster/core/client"
 )
 
-// PClients 属于同一个项目的用户和服务端放在同一个PClients中
-type PClients struct {
+// Project 属于同一个项目的用户和服务端放在同一个PClients中
+type Project struct {
 	pid      string
 	uClients map[string][]string // 连接的用户端 key:uid value:[]clientID
 	sClients map[string][]string // 连接的服务端 key:uid value:[]clientID
@@ -18,7 +18,7 @@ type PClients struct {
 type manager struct {
 	opts         Options
 	clients      map[string]client.Client // key:clientID value:client
-	pClients     map[string]PClients      // key:pid value:PUClient
+	projects     map[string]Project       // key:pid value:PUClient
 	adminClients []string                 // value:clientID
 	deadlock.RWMutex
 }
@@ -33,23 +33,23 @@ func (m *manager) Join(ctx context.Context, c client.Client) {
 	case client.CTypeAdmin:
 		m.adminClients = append(m.adminClients, cid)
 	case client.CTypeServer:
-		if _, ok := m.pClients[pid]; !ok {
-			m.pClients[pid] = PClients{
+		if _, ok := m.projects[pid]; !ok {
+			m.projects[pid] = Project{
 				pid:      pid,
 				uClients: make(map[string][]string),
 				sClients: make(map[string][]string),
 			}
 		}
-		m.pClients[pid].sClients[uid] = append(m.pClients[pid].sClients[uid], cid)
+		m.projects[pid].sClients[uid] = append(m.projects[pid].sClients[uid], cid)
 	case client.CTypeUser:
-		if _, ok := m.pClients[pid]; !ok {
-			m.pClients[pid] = PClients{
+		if _, ok := m.projects[pid]; !ok {
+			m.projects[pid] = Project{
 				pid:      pid,
 				uClients: make(map[string][]string),
 				sClients: make(map[string][]string),
 			}
 		}
-		m.pClients[pid].uClients[uid] = append(m.pClients[pid].uClients[uid], cid)
+		m.projects[pid].uClients[uid] = append(m.projects[pid].uClients[uid], cid)
 	}
 	m.opts.logger.Debugf(ctx, "manager-join c %s", c)
 }
@@ -70,15 +70,15 @@ func (m *manager) Remove(ctx context.Context, c client.Client) {
 			}
 		}
 	case client.CTypeServer:
-		for i, tempCid := range m.pClients[pid].sClients[uid] {
+		for i, tempCid := range m.projects[pid].sClients[uid] {
 			if tempCid == cid {
-				m.pClients[pid].sClients[uid] = append(m.pClients[pid].sClients[uid][:i], m.pClients[pid].sClients[uid][i+1:]...)
+				m.projects[pid].sClients[uid] = append(m.projects[pid].sClients[uid][:i], m.projects[pid].sClients[uid][i+1:]...)
 			}
 		}
 	case client.CTypeUser:
-		for i, tempCid := range m.pClients[pid].uClients[uid] {
+		for i, tempCid := range m.projects[pid].uClients[uid] {
 			if tempCid == cid {
-				m.pClients[pid].uClients[uid] = append(m.pClients[pid].uClients[uid][:i], m.pClients[pid].uClients[uid][i+1:]...)
+				m.projects[pid].uClients[uid] = append(m.projects[pid].uClients[uid][:i], m.projects[pid].uClients[uid][i+1:]...)
 			}
 		}
 	}
@@ -112,7 +112,7 @@ func (m *manager) ClientsByUIDs(ctx context.Context, projectID string, userIDs .
 	defer m.RUnlock()
 	var clients []client.Client
 	for _, uid := range userIDs {
-		for _, cid := range m.pClients[projectID].uClients[uid] {
+		for _, cid := range m.projects[projectID].uClients[uid] {
 			if _, ok := m.clients[cid]; !ok {
 				m.opts.logger.Debugf(ctx, "ClientsByUIDs client %s not exist", cid)
 				continue
@@ -129,7 +129,7 @@ func (m *manager) ClientsByPIDs(ctx context.Context, projectIDs ...string) []cli
 	defer m.RUnlock()
 	var clients []client.Client
 	for _, pid := range projectIDs {
-		for _, ids := range m.pClients[pid].uClients {
+		for _, ids := range m.projects[pid].uClients {
 			for _, id := range ids {
 				if _, ok := m.clients[id]; !ok {
 					m.opts.logger.Debugf(ctx, "ClientsByPIDs client %s not exist", id)
@@ -146,7 +146,7 @@ func (m *manager) ServersByPID(ctx context.Context, projectID string) []client.C
 	m.RLock()
 	defer m.RUnlock()
 	var clients []client.Client
-	for _, ids := range m.pClients[projectID].sClients {
+	for _, ids := range m.projects[projectID].sClients {
 		for _, id := range ids {
 			if _, ok := m.clients[id]; !ok {
 				continue
@@ -155,6 +155,35 @@ func (m *manager) ServersByPID(ctx context.Context, projectID string) []client.C
 		}
 	}
 	return clients
+}
+func (m *manager) Projects(ctx context.Context) []ProjectServerClients {
+	m.RLock()
+	defer m.RUnlock()
+	// 深拷贝
+	projects := make([]ProjectServerClients, 0)
+	for pid, project := range m.projects {
+		ps := ProjectServerClients{
+			PID: pid,
+		}
+		for _, ids := range project.uClients {
+			for _, id := range ids {
+				if _, ok := m.clients[id]; !ok {
+					continue
+				}
+				ps.Clients = append(ps.Clients, m.clients[id])
+			}
+		}
+		for _, ids := range project.sClients {
+			for _, id := range ids {
+				if _, ok := m.clients[id]; !ok {
+					continue
+				}
+				ps.Servers = append(ps.Servers, m.clients[id])
+			}
+		}
+		projects = append(projects, ps)
+	}
+	return projects
 }
 
 func (m *manager) Admins(ctx context.Context) []client.Client {
@@ -194,7 +223,7 @@ func NewManager(opts ...Option) Manager {
 	return &manager{
 		opts:         options,
 		clients:      make(map[string]client.Client),
-		pClients:     make(map[string]PClients),
+		projects:     make(map[string]Project),
 		adminClients: make([]string, 0),
 	}
 }

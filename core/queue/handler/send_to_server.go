@@ -8,12 +8,12 @@ import (
 	"github.com/mtgnorton/ws-cluster/shared"
 )
 
-// UserHandler 从消息队列接收到用户端的消息，将其转发给服务端
-type UserHandler struct {
+// SendToServer 从消息队列接收到用户端的消息，将其转发给服务端
+type SendToServer struct {
 	opts *Options
 }
 
-// SendToUserMessage 收窄发送到业务服务端消息的字段
+// SendToServerMessage 收窄发送到业务服务端消息的字段
 type SendToServerMessage struct {
 	AffairID string                `json:"affair_id,omitempty"` // 用户发送消息时，affair_id
 	Payload  interface{}           `json:"payload,omitempty"`
@@ -21,14 +21,14 @@ type SendToServerMessage struct {
 	Source   clustermessage.Source `json:"source,omitempty"`
 }
 
-func (h *UserHandler) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
+func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
 	var (
 		logger  = h.opts.logger
 		manager = h.opts.manager
 	)
 	isAck = true
 	end := shared.TimeoutDetection.Do(time.Second*3, func() {
-		logger.Errorf(ctx, "UserHandler Handle msg timeout,msg:%+v", msg)
+		logger.Errorf(ctx, "SendToServer Handle msg timeout,msg:%+v", msg)
 	})
 	defer end()
 
@@ -44,7 +44,7 @@ func (h *UserHandler) Handle(ctx context.Context, msg *clustermessage.AffairMsg)
 }
 
 func NewUserHandler(opts ...Option) Handle {
-	return &UserHandler{
+	return &SendToServer{
 		opts: NewOptions(opts...),
 	}
 }
