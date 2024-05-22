@@ -96,6 +96,8 @@ func (s *gfServer) connect(r *ghttp.Request) {
 		Type: clustermessage.TypeConnect,
 	})
 
+	fmt.Printf("new client connect:%s\n", c.String())
+
 	s.addMetrics()
 	c.Send(ctx, clustermessage.NewSuccessResp("connect success"))
 	for {
@@ -109,6 +111,7 @@ func (s *gfServer) connect(r *ghttp.Request) {
 
 		if err != nil {
 			logger.Infof(ctx, "Websocket Read err: %v", err)
+			fmt.Printf("client disconnect:%s\n", c.String())
 			s.opts.manager.Remove(ctx, c)
 			s.opts.handler.Handle(ctx, c, &clustermessage.AffairMsg{
 				Type: clustermessage.TypeDisconnect,
