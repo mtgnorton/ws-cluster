@@ -30,13 +30,13 @@ func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) 
 	defer end()
 
 	if pid == "" {
-		logger.Infof(ctx, "push msg pid is empty,msg:%+v", msg)
+		logger.Infof(ctx, "SendToUser msg pid is empty,msg:%+v", msg)
 		return
 	}
 
 	finalClients := manager.ClientsByPIDs(ctx, pid)
 	if len(finalClients) == 0 {
-		logger.Debugf(ctx, "push msg pid %s not found,msg:%+v", pid, msg)
+		logger.Debugf(ctx, "SendToUser msg pid %s not found,msg:%+v", pid, msg)
 		return
 	}
 	if len(uids) > 0 {
@@ -51,10 +51,10 @@ func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) 
 	}
 
 	if len(finalClients) == 0 {
-		logger.Debugf(ctx, "push msg not found client,msg:%+v", msg)
+		logger.Debugf(ctx, "SendToUser msg not found client,msg:%+v", msg)
 		return
 	}
-	logger.Debugf(ctx, "send msg to clients:%+v,msg:%+v,to:%+v", finalClients, msg, msg.To)
+	logger.Debugf(ctx, "SendToUser msg to clients:%+v,msg:%+v,to:%+v", finalClients, msg, msg.To)
 	for _, client := range finalClients {
 		client.Send(ctx, SendToUserMessage{
 			AffairID: msg.AffairID,
