@@ -6,7 +6,7 @@ import (
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 )
 
-var DefaultPushHandler = NewServerHandler()
+var DefaultPushHandler = NewSendToUserHandler()
 
 type Handle interface {
 	Handle(ctx context.Context, payload *clustermessage.AffairMsg) (isAck bool)

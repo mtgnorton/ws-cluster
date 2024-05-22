@@ -64,7 +64,7 @@ func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) 
 	return
 }
 
-func NewServerHandler(opts ...Option) Handle {
+func NewSendToUserHandler(opts ...Option) Handle {
 	return &SendToUser{
 		opts: NewOptions(opts...),
 	}
