@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"time"
 
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/client"
@@ -13,11 +14,52 @@ type WsHandler struct {
 
 func NewWsHandler(opts ...Option) *WsHandler {
 	options := NewOptions(opts...)
-	return &WsHandler{
+	w := &WsHandler{
 		opts: options,
 	}
+	go w.sendClientsLoop()
+	return w
 }
 
+// sendClientsLoop 定时推送用户端的连接信息
+func (w *WsHandler) sendClientsLoop() {
+	var (
+		ctx    = w.opts.ctx
+		logger = w.opts.logger
+	)
+	for range time.Tick(2 * time.Second) {
+		// 获取所有的用户端的连接信息
+		// 遍历所有的服务端
+		// 发送给服务端
+		for _, projectServerClients := range w.opts.manager.Projects(ctx) {
+			cids := make([]string, 0)
+			for _, c := range projectServerClients.Clients {
+				cid, _, _ := c.GetIDs()
+				cids = append(cids, cid)
+			}
+			if len(cids) == 0 {
+				continue
+			}
+			msg := clustermessage.AffairMsg{
+				AffairID: "",
+				AckID:    "",
+				Payload:  cids,
+				Type:     clustermessage.TypeOnlineClients,
+				Source: &clustermessage.Source{
+					PID: projectServerClients.PID,
+					UID: "",
+					CID: "",
+				},
+				To: nil,
+			}
+			err := w.opts.queue.Publish(ctx, &msg)
+			if err != nil {
+				logger.Infof(ctx, "WsHandler-sendClientsLoop publish error %v", err)
+			}
+
+		}
+	}
+}
 func (w *WsHandler) Handle(ctx context.Context, c client.Client, msg *clustermessage.AffairMsg) {
 	//w.opts.logger.Debugf(ctx, "Receive msg %+v", msg)
 	// 管理端: 所有消息类型

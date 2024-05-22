@@ -32,6 +32,9 @@ func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg
 	})
 	defer end()
 
+	if msg.Source == nil {
+		return
+	}
 	servers := manager.ServersByPID(ctx, msg.Source.PID)
 	logger.Debugf(ctx, "Send to server msg:%+v, servers:%+v", msg, servers)
 	if len(servers) == 0 {
@@ -43,7 +46,7 @@ func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg
 	return
 }
 
-func NewUserHandler(opts ...Option) Handle {
+func NewSendToServerHandler(opts ...Option) Handle {
 	return &SendToServer{
 		opts: NewOptions(opts...),
 	}

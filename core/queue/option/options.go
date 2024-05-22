@@ -36,14 +36,15 @@ func NewOptions(opts ...Option) Options {
 		Prometheus: wsprometheus.DefaultPrometheus,
 	}
 
-	userHandler := handler.NewUserHandler()
-	serverHandler := handler.NewServerHandler()
+	sendToServerHandler := handler.NewSendToServerHandler()
+	sendToUserHandler := handler.NewSendToUserHandler()
 
 	options.Handlers = map[clustermessage.Type]handler.Handle{
-		clustermessage.TypePush:       serverHandler,
-		clustermessage.TypeRequest:    userHandler,
-		clustermessage.TypeConnect:    userHandler,
-		clustermessage.TypeDisconnect: userHandler,
+		clustermessage.TypePush:          sendToUserHandler,
+		clustermessage.TypeRequest:       sendToServerHandler,
+		clustermessage.TypeConnect:       sendToServerHandler,
+		clustermessage.TypeDisconnect:    sendToServerHandler,
+		clustermessage.TypeOnlineClients: sendToServerHandler,
 	}
 	for _, o := range opts {
 		o(&options)
