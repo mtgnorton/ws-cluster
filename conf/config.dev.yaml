@@ -21,11 +21,11 @@ queue:
     version: 3.2.0
 log:
   path: logs
-  print: true # 是否打印日志
+  print: false # 是否打印日志
   level: debug # 日志级别 debug, info, warn, error,dpanic, panic, fatal
   max_age: 7 # 日志保存天数
-  max_size: 100 # 单个日志文件大小，单位MB
-  max_backups: 10 # 日志文件最大备份数
+  max_size: 2000 # 单个日志文件大小，单位MB
+  max_backups: 50 # 日志文件最大备份数
   compress: true # 是否压缩日志
 redis:
   addr: localhost:6379

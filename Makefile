@@ -9,9 +9,9 @@ build-linux:
 kill:
 	kill -9 `ps -ef | grep $(NAME) | grep -v grep | awk '{print $$2}'`;
 run-dev:
-	nohup ./$(NAME) --queue redis  --env dev &
+	nohup ./$(NAME) --queue redis  --env dev >/dev/null 2>&1 &
 run-prod:
-	nohup ./$(NAME) --queue redis  --env prod &
+	nohup ./$(NAME) --queue redis  --env prod >/dev/null 2>&1 &
 ps:
 	ps -ef | grep $(NAME)
 tail-log:
