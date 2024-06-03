@@ -99,7 +99,7 @@ func (s *gfServer) connect(r *ghttp.Request) {
 	fmt.Printf("new client connect:%s\n", c.String())
 
 	s.addMetrics()
-	c.Send(ctx, clustermessage.NewSuccessResp("connect success"))
+	c.Send(ctx, clustermessage.NewSuccessResp(fmt.Sprintf("connect success:%s", c.String())))
 	for {
 
 		//if hub := wssentry.GetHubFromContext(r); hub != nil {
