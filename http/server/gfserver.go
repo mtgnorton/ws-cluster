@@ -2,14 +2,16 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/gogf/gf/v2/util/gutil"
+
+	"github.com/mtgnorton/ws-cluster/shared/auth"
 
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/client"
-
-	"github.com/mtgnorton/ws-cluster/shared"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -85,36 +87,59 @@ func (g gfServer) Stop() error {
 // 推送消息
 //
 //	@Summary		业务系统通过该接口推送消息
-//	@Description	业务系统通过该接口推送消息
+//	@Description	业务系统通过该接口推送消息,当同时传递了uids和cids时，会求并集
 //	@ID				push-message
 //	@Accept			json
 //	@Produce		json
-//	@Param			pid		query		string		true	"项目id"
 //	@Param			uids	query		string		false	"用户id，多个用户id以逗号隔开"
 //	@Param			cids	query		string		false	"客户端id,多个客户端id以逗号隔开"
-//	@Param			tags	query		string		false	"标签,多个标签以逗号隔开"
-//	@Param			sign	query		string		true	"签名"
-//	@Param			data	query		string		true	"推送的消息内容"
+//	@Param			token	query		string		true	"签名"
+//	@Param			data	query		string		true	"推送的消息内容,建议为json"
 //	@Success		200		{string}	string		"{"code":1,"msg":"success","payload":{}}"
 //	@Failure		200		{object}	message.Res	"code=0,msg=error"
 //	@Router			/push [post]
 func (g gfServer) handler(r *ghttp.Request) {
-
-	claims, err := shared.DefaultJwtWs.Parse(r.Get("token").String())
+	var (
+		token  = r.Get("token").String()
+		uidStr = r.Get("uids").String()
+		cidStr = r.Get("cids").String()
+		data   = r.Get("data").String()
+		uids   []string
+		cids   []string
+	)
+	userData, err := auth.Decode(token)
 	if err != nil {
 		r.Response.WriteJson(clustermessage.NewErrorResp("token error"))
 		return
 	}
-	if claims.ClientType == int(client.CTypeUser) {
+	if userData.ClientType == int(client.CTypeUser) {
 		r.Response.WriteJson(clustermessage.NewErrorResp("permission denied"))
 		return
 	}
-	msg := &clustermessage.AffairMsg{}
-	err = json.Unmarshal(r.GetBody(), &msg)
-	if err != nil {
-		r.Response.WriteJson(clustermessage.NewErrorResp("parse message error"))
+	for _, uid := range strings.Split(uidStr, ",") {
+		uid = strings.TrimSpace(uid)
+		if len(uid) > 0 {
+			uids = append(uids, uid)
+		}
+	}
+	for _, cid := range strings.Split(cidStr, ",") {
+		cid = strings.TrimSpace(cid)
+		if len(cid) > 0 {
+			cids = append(cids, cid)
+		}
+	}
+	if len(uids) == 0 && len(cids) == 0 {
+		r.Response.WriteJson(clustermessage.NewErrorResp("uids or cids is required"))
 		return
 	}
+
+	msg := &clustermessage.AffairMsg{
+		Payload: data,
+		Type:    clustermessage.TypePush,
+		To:      &clustermessage.To{PID: userData.PID, UIDs: uids, CIDs: cids},
+	}
+	gutil.Dump(msg)
+
 	// 随机休眠0-10s
 	// time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
 

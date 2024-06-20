@@ -93,8 +93,8 @@ type AffairMsg struct {
 	AckID    string      `json:"ack_id,omitempty" `   // ws应答唯一id，当ws集群收到消息时，会将该ackId返回给用户端，告知用户端接受成功,如果ackID为空，ws集群不会回复成功消息
 	Payload  interface{} `json:"payload,omitempty"`
 	Type     Type        `json:"type,omitempty"`
-	Source   *Source     `json:"source,omitempty"` // 用户消息，在发送到消息队列时，需要由ws集群附加source
-	To       *To         `json:"to,omitempty"`     // 需要由业务服务端附加
+	Source   *Source     `json:"source,omitempty"` // ws集群附加source,代表哪个用户发送
+	To       *To         `json:"to,omitempty"`     // 业务服务端附加to,代表发送给哪个用户
 }
 
 type Source struct {
