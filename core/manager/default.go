@@ -15,6 +15,8 @@ type Project struct {
 	uClients map[string][]string // 连接的用户端 key:uid value:[]clientID
 	sClients map[string][]string // 连接的服务端 key:uid value:[]clientID
 }
+
+// manager 管理所有客户端
 type manager struct {
 	opts         Options
 	clients      map[string]client.Client // key:clientID value:client
@@ -201,10 +203,6 @@ func (m *manager) Exist(ctx context.Context, clientID string) bool {
 	defer m.RUnlock()
 	_, ok := m.clients[clientID]
 	return ok
-}
-
-func (m *manager) CheckExpired(ctx context.Context) {
-	m.checkExpired(ctx)
 }
 
 func (m *manager) checkExpired(ctx context.Context) {
