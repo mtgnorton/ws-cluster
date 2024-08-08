@@ -21,6 +21,11 @@ func NewWsHandler(opts ...Option) *WsHandler {
 	return w
 }
 
+type OnlineClient struct {
+	CID string `json:"cid"`
+	UID string `json:"uid"`
+}
+
 // sendClientsLoop 定时推送用户端的连接信息
 func (w *WsHandler) sendClientsLoop() {
 	var (
@@ -32,18 +37,21 @@ func (w *WsHandler) sendClientsLoop() {
 		// 遍历所有的服务端
 		// 发送给服务端
 		for _, projectServerClients := range w.opts.manager.Projects(ctx) {
-			cids := make([]string, 0)
+			onlineClients := make([]*OnlineClient, 0)
 			for _, c := range projectServerClients.Clients {
-				cid, _, _ := c.GetIDs()
-				cids = append(cids, cid)
+				cid, uid, _ := c.GetIDs()
+				onlineClients = append(onlineClients, &OnlineClient{
+					CID: cid,
+					UID: uid,
+				})
 			}
-			if len(cids) == 0 {
+			if len(onlineClients) == 0 {
 				continue
 			}
 			msg := clustermessage.AffairMsg{
 				AffairID: "",
 				AckID:    "",
-				Payload:  cids,
+				Payload:  onlineClients,
 				Type:     clustermessage.TypeOnlineClients,
 				Source: &clustermessage.Source{
 					PID: projectServerClients.PID,
