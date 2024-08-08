@@ -1,12 +1,15 @@
 package utils
 
 import (
+	"bytes"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/gogf/gf/v2/util/gutil"
 )
 
 // GetCurrentAbPath 获取当前执行文件绝对路径
@@ -37,4 +40,10 @@ func getCurrentAbPathByCaller() string {
 		abPath = path.Dir(filename)
 	}
 	return abPath
+}
+
+func DeepPretty(v interface{}) string {
+	c := bytes.NewBuffer([]byte{})
+	gutil.DumpTo(c, v, gutil.DumpOption{})
+	return c.String()
 }

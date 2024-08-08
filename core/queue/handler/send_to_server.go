@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/mtgnorton/ws-cluster/shared/utils"
+
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/shared"
 )
@@ -36,7 +38,7 @@ func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg
 		return
 	}
 	servers := manager.ServersByPID(ctx, msg.Source.PID)
-	logger.Debugf(ctx, "SendToServer msg:%+v, servers:%+v", msg, servers)
+	logger.Debugf(ctx, "SendToServer msg:%v, servers:%+v", utils.DeepPretty(msg), servers)
 	if len(servers) == 0 {
 		return
 	}
