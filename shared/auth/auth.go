@@ -23,12 +23,10 @@ func Decode(s string, key ...string) (*UserData, error) {
 	if len(key) > 0 {
 		aesKey = key[0]
 	}
-
-	// 判断长度是否是3的倍数，如果不是增加=
-	if len(s)%3 != 0 {
-		s += strings.Repeat("=", 3-len(s)%3)
+	// 判断长度是否是4的倍数，如果不是增加=
+	if len(s)%4 != 0 {
+		s += strings.Repeat("=", 4-len(s)%4)
 	}
-
 	base64, err := base64.URLEncoding.DecodeString(s)
 	if err != nil {
 		return nil, err

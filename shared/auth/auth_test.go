@@ -7,12 +7,17 @@ import (
 
 func Test_Encode(t *testing.T) {
 	r := MustEncode(&UserData{
-		PID:        "66",
-		UID:        "22222",
+		PID:        "503",
+		UID:        "2222222",
 		ClientType: 0,
 	})
 	fmt.Println(r)
-	r = "hhV4m8A27TRcSAAxcws5YA"
+	fmt.Println(Decode(r))
+}
+
+func Test_Decode(t *testing.T) {
+	r := "1RsNiOc8sqaIRJ0j95p-aVObzarvZOFQPc-kbbOWXX0="
+	//fmt.Println(r[44])
 	user, err := Decode(r)
 	if err != nil {
 		t.Error(err)
