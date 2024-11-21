@@ -108,7 +108,6 @@ func (s *gfServer) connect(r *ghttp.Request) {
 		//	})
 		//}
 		_, msgBytes, err := socket.ReadMessage()
-		logger.Debugf(ctx, " recieve-msg: %s", msgBytes)
 
 		if err != nil {
 			logger.Infof(ctx, "Websocket Read err: %v", err)

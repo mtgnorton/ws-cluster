@@ -7,9 +7,9 @@ import (
 
 func Test_Encode(t *testing.T) {
 	r := MustEncode(&UserData{
-		PID:        "503",
-		UID:        "2222222",
-		ClientType: 0,
+		PID:        "578",
+		UID:        "1996",
+		ClientType: 32832,
 	})
 	fmt.Println(r)
 	fmt.Println(Decode(r))

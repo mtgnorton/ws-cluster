@@ -1,3 +1,16 @@
+## pid
+flink 
+   saas 资产推送 订单盈利 订单流转 578   
+
+roy 
+   行情系统  k线 market 502
+
+   saas 配置更新 策略更新 502 openapi开通账户通知 503
+   
+norton 
+   metatrader模块 66
+
+
 ## 功能
 
 1. ws 集群
@@ -86,5 +99,9 @@
 2. 订阅
 3. 请求   
    c1->router->s1->router->c1
+
+
+
+
 
 
