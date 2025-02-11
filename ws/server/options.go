@@ -3,11 +3,11 @@ package server
 import (
 	"context"
 
-	"github.com/mtgnorton/ws-cluster/config"
-	"github.com/mtgnorton/ws-cluster/core/manager"
-	"github.com/mtgnorton/ws-cluster/logger"
-	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
-	"github.com/mtgnorton/ws-cluster/ws/handler"
+	"ws-cluster/config"
+	"ws-cluster/core/manager"
+	"ws-cluster/logger"
+	"ws-cluster/tools/wsprometheus"
+	"ws-cluster/ws/handler"
 )
 
 type Option func(*Options)

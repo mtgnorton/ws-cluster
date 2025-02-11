@@ -3,7 +3,7 @@ package jwtws
 import (
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/config"
+	"ws-cluster/config"
 
 	jwt "github.com/dgrijalva/jwt-go"
 )

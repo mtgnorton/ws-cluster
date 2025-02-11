@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 
-	"github.com/mtgnorton/ws-cluster/logger"
+	"ws-cluster/logger"
 )
 
 type Device string

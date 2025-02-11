@@ -3,5 +3,5 @@ package qtype
 type Topic string
 
 const (
-	TopicDefault = "default"
+	TopicDefault = "ws_queue_stream"
 )

@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/shared"
+	"ws-cluster/shared"
+
 	"github.com/sasha-s/go-deadlock"
 
 	"github.com/gorilla/websocket"

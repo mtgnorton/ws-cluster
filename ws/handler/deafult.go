@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/clustermessage"
-	"github.com/mtgnorton/ws-cluster/core/client"
+	"ws-cluster/clustermessage"
+	"ws-cluster/core/client"
 )
 
 type WsHandler struct {
@@ -109,17 +109,17 @@ func (w *WsHandler) handleMsgFromServer(ctx context.Context, c client.Client, ms
 	)
 	// 如果没有传递到的用户，直接返回
 	if len(msg.To.CIDs) == 0 && len(msg.To.UIDs) == 0 {
-		logger.Infof(ctx, "WsHandler-handleMsgFromServer msg.To is empty")
+		logger.Infof(ctx, "WsHandler-FromServer msg.To is empty")
 		return
 	}
 	_, _, msg.To.PID = c.GetIDs()
 
 	err := queue.Publish(ctx, msg)
 	if err != nil {
-		logger.Infof(ctx, "WsHandler-handleMsgFromServerserver publish error %v", err)
+		logger.Infof(ctx, "WsHandler-FromServer publish error %v", err)
 		return
 	}
-	logger.Debugf(ctx, "WsHandler-handleMsgFromServer  msg  success,msg:%+v,To:%+v", msg, msg.To)
+	logger.Debugf(ctx, "WsHandler-FromServer  msg  success,msg:%+v,To:%+v", msg, msg.To)
 	if msg.AckID != "" {
 		c.Send(ctx, clustermessage.NewAck(msg.AckID))
 	}
@@ -136,10 +136,10 @@ func (w *WsHandler) handleMsgFromUser(ctx context.Context, c client.Client, msg 
 	}
 	err := w.opts.queue.Publish(ctx, msg)
 	if err != nil {
-		w.opts.logger.Infof(ctx, "WsHandler-handleMsgFromUser user publish error %v", err)
+		w.opts.logger.Infof(ctx, "WsHandler-FromUser user publish error %v", err)
 		return
 	}
-	w.opts.logger.Debugf(ctx, "WsHandler-handleMsgFromUser  msg  success,msg:%v", msg)
+	w.opts.logger.Debugf(ctx, "WsHandler-FromUser  msg  success,msg:%v", msg)
 	if msg.AckID != "" {
 		c.Send(ctx, clustermessage.NewAck(msg.AckID))
 	}

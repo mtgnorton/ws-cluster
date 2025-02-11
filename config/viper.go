@@ -13,42 +13,59 @@ type viperConfig struct {
 }
 
 func (c *viperConfig) load() Config {
-	viper.SetConfigName("Config")
-
-	viper.AddConfigPath("./conf")
-	viper.AddConfigPath(".")
-	viper.SetConfigType("yaml")
-
-	viper.SetEnvPrefix("WS") // 设置环境变量前缀，Viper在自动绑定环境变量时会带上这个前缀
+	viper.SetEnvPrefix("WS")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 
-	//viper.AutomaticEnv() // Viper从环境变量中读取配置
-
-	err := viper.BindEnv("env", "node")
-	if err != nil {
-		panic(err)
-	}
-
+	// 添加命令行参数
+	pflag.String("config", "", "set config file path")
 	pflag.String("env", "", "set env,options:dev,prod,local")
-	pflag.String("node", "100", "set node,usage snowflake node id and sentry")
+	pflag.String("node", "", "set node,usage snowflake node id and sentry")
 	pflag.Int("ws_port", 8084, "set ws server port")
 	pflag.Int("http_port", 8085, "set http server port")
 	pflag.String("router", "", "set router address")
 	pflag.String("queue", "redis", "set queue type, options:redis,kafka")
 
-	pflag.Parse() // 解析命令行参数
+	pflag.Parse()
+
+	err := viper.BindEnv("env")
+	if err != nil {
+		panic(err)
+	}
+	err = viper.BindEnv("node")
+	if err != nil {
+		panic(err)
+	}
+	// 绑定环境变量（确保在 BindPFlag 之后）
+	err = viper.BindEnv("config")
+	if err != nil {
+		panic(err)
+	}
+
+	// 绑定配置文件路径
+	err = viper.BindPFlag("config", pflag.Lookup("config"))
+	if err != nil {
+		panic(err)
+	}
+
+	// 优先检查是否指定了配置文件路径
+	configPath := viper.GetString("config")
+
+	if configPath != "" {
+		fmt.Println("使用指定的配置文件路径:", configPath)
+		viper.SetConfigFile(configPath)
+	} else {
+		fmt.Println("使用默认配置文件路径")
+		viper.SetConfigName("Config")
+		viper.AddConfigPath("./conf")
+		viper.AddConfigPath(".")
+		viper.SetConfigType("yaml")
+	}
 
 	err = viper.BindPFlag("env", pflag.Lookup("env"))
 	if err != nil {
 		panic(err)
 	}
 
-	env := pflag.Lookup("env").Value.String()
-	if env != "" { // 如果设置了env，则加载对应的配置文件,否则加载默认的配置文件
-		configName := "config." + env + ".yaml"
-		viper.SetConfigName(configName)
-		fmt.Println("configName:", configName)
-	}
 	err = viper.BindPFlag("node", pflag.Lookup("node"))
 	if err != nil {
 		panic(err)

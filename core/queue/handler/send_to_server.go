@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/shared/utils"
+	"ws-cluster/shared/kit"
+	"ws-cluster/shared/utils"
 
-	"github.com/mtgnorton/ws-cluster/clustermessage"
-	"github.com/mtgnorton/ws-cluster/shared"
+	"ws-cluster/clustermessage"
 )
 
 // SendToServer 从消息队列接收到用户端的消息，将其转发给服务端
@@ -29,8 +29,8 @@ func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg
 		manager = h.opts.manager
 	)
 	isAck = true
-	end := shared.TimeoutDetection.Do(time.Second*3, func() {
-		logger.Errorf(ctx, "SendToServer  msg timeout,msg:%+v", msg)
+	end := kit.DoWithTimeout(time.Second*3, func() {
+		logger.Errorf(ctx, "QueueHandler SendToServer Handle msg timeout,msg:%+v", msg)
 	})
 	defer end()
 
@@ -38,7 +38,7 @@ func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg
 		return
 	}
 	servers := manager.ServersByPID(ctx, msg.Source.PID)
-	logger.Debugf(ctx, "SendToServer msg:%v, servers:%+v", utils.DeepPretty(msg), servers)
+	logger.Debugf(ctx, "QueueHandler SendToServer msg:%v, servers:%+v", utils.DeepPretty(msg), servers)
 	if len(servers) == 0 {
 		return
 	}

@@ -102,7 +102,7 @@ type Swagger struct {
 	Port   int    `mapstructure:"port"`
 }
 
-func NewViperConfig() Config {
+func NewViperConfig(configFullPath ...string) Config {
 
 	c := &viperConfig{}
 	c.load()

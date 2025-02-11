@@ -2,24 +2,30 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/shared"
+	"ws-cluster/shared"
 
-	server2 "github.com/mtgnorton/ws-cluster/http/server"
+	httpServer "ws-cluster/http/server"
 
-	"github.com/mtgnorton/ws-cluster/ws/server"
+	"ws-cluster/ws/server"
+
+	"ws-cluster/tools/swagger"
+	"ws-cluster/tools/wsprometheus"
 
 	"github.com/gogf/gf/v2/frame/g"
-	"github.com/mtgnorton/ws-cluster/tools/swagger"
-	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 	swaggerFiles "github.com/swaggo/files"
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
+	"ws-cluster/config"
+	"ws-cluster/docs"
+
 	"github.com/getsentry/sentry-go"
-	"github.com/mtgnorton/ws-cluster/config"
-	"github.com/mtgnorton/ws-cluster/docs"
+	"github.com/sasha-s/go-deadlock"
 )
 
 //	@title			Ws-cluster API
@@ -35,13 +41,41 @@ import (
 func main() {
 
 	c := config.DefaultConfig
-	shared.InitSnowflakeRedisJwt(c)
+	if c.Values().Env == config.Prod {
+		deadlock.Opts.Disable = true
+	}
+	shared.InitRedis(c)
+	shared.InitIP()
+
+	shared.GetNodeID(c)
 	toolServer(c)
 	defer sentry.Flush(time.Second * 3)
 
-	go server2.DefaultHttpServer.Run()
+	go httpServer.DefaultHttpServer.Run()
 
-	server.DefaultWsServer.Run()
+	go server.DefaultWsServer.Run()
+	// 程序退出信号处理
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	// 优雅关闭
+	fmt.Println("正在关闭服务...")
+
+	if shared.NodeIDWorker != nil {
+		shared.NodeIDWorker.Release()
+	}
+	// 关闭HTTP服务器
+	if err := httpServer.DefaultHttpServer.Stop(); err != nil {
+		fmt.Printf("HTTP服务器关闭失败: %v\n", err)
+	}
+
+	// 关闭WebSocket服务器
+	if err := server.DefaultWsServer.Stop(); err != nil {
+		fmt.Printf("WebSocket服务器关闭失败: %v\n", err)
+	}
+
+	fmt.Println("服务已安全关闭")
 }
 
 func toolServer(c config.Config) {

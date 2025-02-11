@@ -3,10 +3,10 @@ package handler
 import (
 	"context"
 
-	"github.com/mtgnorton/ws-cluster/config"
-	"github.com/mtgnorton/ws-cluster/core/manager"
-	"github.com/mtgnorton/ws-cluster/core/queue"
-	"github.com/mtgnorton/ws-cluster/logger"
+	"ws-cluster/config"
+	"ws-cluster/core/manager"
+	"ws-cluster/core/queue"
+	"ws-cluster/logger"
 )
 
 type Option func(*Options)

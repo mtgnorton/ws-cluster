@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"github.com/mtgnorton/ws-cluster/core/manager"
-	"github.com/mtgnorton/ws-cluster/logger"
+	"ws-cluster/core/manager"
+	"ws-cluster/logger"
 )
 
 type Option func(*Options)

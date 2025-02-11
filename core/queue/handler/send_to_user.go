@@ -4,9 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/shared"
-
-	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"ws-cluster/clustermessage"
+	"ws-cluster/shared/kit"
 )
 
 // SendToUser 从消息队列接收到业务服务端的消息，将其转发给用户端
@@ -21,22 +20,32 @@ type SendToUserMessage struct {
 }
 
 func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
+	var (
+		source *clustermessage.Source
+		to     *clustermessage.To
+	)
+	if msg.Source != nil {
+		source = msg.Source
+	}
+	if msg.To != nil {
+		to = msg.To
+	}
 	logger, manager, isAck := h.opts.logger, h.opts.manager, true
-	pid, uids, cids := msg.To.PID, msg.To.UIDs, msg.To.CIDs
+	pid, uids, cids := to.PID, to.UIDs, to.CIDs
 
-	end := shared.TimeoutDetection.Do(time.Second*3, func() {
-		logger.Errorf(ctx, "SendToUser Handle msg timeout,msg:%+v", msg)
+	end := kit.DoWithTimeout(time.Second*3, func() {
+		logger.Errorf(ctx, "QueueHandler SendToUser Handle msg timeout,msg:%+v", msg)
 	})
 	defer end()
 
 	if pid == "" {
-		logger.Infof(ctx, "SendToUser msg pid is empty,msg:%+v", msg)
+		logger.Infof(ctx, "QueueHandler SendToUser msg pid is empty,msg:%+v,from:%+v,to:%+v", msg.Payload, source, to)
 		return
 	}
 
 	finalClients := manager.ClientsByPIDs(ctx, pid)
 	if len(finalClients) == 0 {
-		logger.Debugf(ctx, "SendToUser msg pid %s not found,msg:%+v", pid, msg)
+		logger.Debugf(ctx, "QueueHandler SendToUser msg pid %s not found,msg:%+v,from:%+v,to:%+v", pid, msg.Payload, source, to)
 		return
 	}
 	if len(uids) > 0 {
@@ -51,10 +60,10 @@ func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) 
 	}
 
 	if len(finalClients) == 0 {
-		logger.Debugf(ctx, "SendToUser msg not found client,msg:%+v", msg)
+		logger.Debugf(ctx, "QueueHandler SendToUser msg not found client,msg:%+v,from:%+v,to:%+v", msg.Payload, source, to)
 		return
 	}
-	logger.Debugf(ctx, "SendToUser msg to clients:%+v,msg:%+v,to:%+v", finalClients, msg, msg.To)
+	logger.Debugf(ctx, "QueueHandler SendToUser msg to clients:%+v,msg:%+v,from:%+v,to:%+v", finalClients, msg.Payload, source, to)
 	for _, client := range finalClients {
 		client.Send(ctx, SendToUserMessage{
 			AffairID: msg.AffairID,

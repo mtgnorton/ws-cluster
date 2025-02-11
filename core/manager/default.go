@@ -6,7 +6,7 @@ import (
 
 	"github.com/sasha-s/go-deadlock"
 
-	"github.com/mtgnorton/ws-cluster/core/client"
+	"ws-cluster/core/client"
 )
 
 // Project 属于同一个项目的用户和服务端放在同一个PClients中
@@ -18,10 +18,9 @@ type Project struct {
 
 // manager 管理所有客户端
 type manager struct {
-	opts         Options
-	clients      map[string]client.Client // key:clientID value:client
-	projects     map[string]Project       // key:pid value:PUClient
-	adminClients []string                 // value:clientID
+	opts     Options
+	clients  map[string]client.Client // key:clientID value:client
+	projects map[string]Project       // key:pid value:PUClient
 	deadlock.RWMutex
 }
 
@@ -31,26 +30,17 @@ func (m *manager) Join(ctx context.Context, c client.Client) {
 	m.Lock()
 	defer m.Unlock()
 	m.clients[cid] = c
-	switch c.Type() {
-	case client.CTypeAdmin:
-		m.adminClients = append(m.adminClients, cid)
-	case client.CTypeServer:
-		if _, ok := m.projects[pid]; !ok {
-			m.projects[pid] = Project{
-				pid:      pid,
-				uClients: make(map[string][]string),
-				sClients: make(map[string][]string),
-			}
+	if _, ok := m.projects[pid]; !ok {
+		m.projects[pid] = Project{
+			pid:      pid,
+			uClients: make(map[string][]string),
+			sClients: make(map[string][]string),
 		}
+	}
+	switch c.Type() {
+	case client.CTypeServer:
 		m.projects[pid].sClients[uid] = append(m.projects[pid].sClients[uid], cid)
 	case client.CTypeUser:
-		if _, ok := m.projects[pid]; !ok {
-			m.projects[pid] = Project{
-				pid:      pid,
-				uClients: make(map[string][]string),
-				sClients: make(map[string][]string),
-			}
-		}
 		m.projects[pid].uClients[uid] = append(m.projects[pid].uClients[uid], cid)
 	}
 	m.opts.logger.Debugf(ctx, "manager-join c %s", c)
@@ -65,12 +55,6 @@ func (m *manager) Remove(ctx context.Context, c client.Client) {
 	delete(m.clients, cid)
 
 	switch c.Type() {
-	case client.CTypeAdmin:
-		for i, tempCid := range m.adminClients {
-			if tempCid == cid {
-				m.adminClients = append(m.adminClients[:i], m.adminClients[i+1:]...)
-			}
-		}
 	case client.CTypeServer:
 		for i, tempCid := range m.projects[pid].sClients[uid] {
 			if tempCid == cid {
@@ -84,7 +68,6 @@ func (m *manager) Remove(ctx context.Context, c client.Client) {
 			}
 		}
 	}
-
 	m.opts.logger.Debugf(ctx, "manager-remove c %s", c)
 }
 
@@ -158,13 +141,13 @@ func (m *manager) ServersByPID(ctx context.Context, projectID string) []client.C
 	}
 	return clients
 }
-func (m *manager) Projects(ctx context.Context) []ProjectServerClients {
+func (m *manager) Projects(ctx context.Context) []ProjectAllClients {
 	m.RLock()
 	defer m.RUnlock()
-	// 深拷贝
-	projects := make([]ProjectServerClients, 0)
+
+	projects := make([]ProjectAllClients, 0)
 	for pid, project := range m.projects {
-		ps := ProjectServerClients{
+		ps := ProjectAllClients{
 			PID: pid,
 		}
 		for _, ids := range project.uClients {
@@ -188,16 +171,6 @@ func (m *manager) Projects(ctx context.Context) []ProjectServerClients {
 	return projects
 }
 
-func (m *manager) Admins(ctx context.Context) []client.Client {
-	m.RLock()
-	defer m.RUnlock()
-	var clients []client.Client
-	for _, id := range m.adminClients {
-		clients = append(clients, m.clients[id])
-	}
-	return clients
-}
-
 func (m *manager) Exist(ctx context.Context, clientID string) bool {
 	m.RLock()
 	defer m.RUnlock()
@@ -219,9 +192,8 @@ func (m *manager) checkExpired(ctx context.Context) {
 func NewManager(opts ...Option) Manager {
 	options := NewOptions(opts...)
 	return &manager{
-		opts:         options,
-		clients:      make(map[string]client.Client),
-		projects:     make(map[string]Project),
-		adminClients: make([]string, 0),
+		opts:     options,
+		clients:  make(map[string]client.Client),
+		projects: make(map[string]Project),
 	}
 }
