@@ -2,26 +2,23 @@ package queue
 
 import (
 	"context"
-	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
+	"ws-cluster/shared/kit"
+	"ws-cluster/tools/wsprometheus"
 
-	"github.com/sasha-s/go-deadlock"
+	"ws-cluster/clustermessage"
+	"ws-cluster/core/queue/option"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/mtgnorton/ws-cluster/clustermessage"
-	"github.com/mtgnorton/ws-cluster/core/queue/option"
+	"github.com/redis/go-redis/v9"
 )
 
+// 使用xread实现的队列
 type redisQueue struct {
-	opts            option.Options
-	redisClient     *redis.Client
-	groupName       string
-	consumerName    string
-	lastReceiveTime time.Time
-	mu              deadlock.RWMutex
+	opts        option.Options
+	redisClient *redis.Client
+	startTime   time.Time
 }
 
 func NewRedisQueue(opts ...option.Option) (q Queue) {
@@ -36,11 +33,11 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 	redisClient := redis.NewClient(&redis.Options{Addr: c.Values().Queue.Redis.Addr, Password: c.Values().Queue.Redis.Password, Username: c.Values().Queue.Redis.User, DB: c.Values().Queue.Redis.DB})
 
 	return &redisQueue{
-		opts:         options,
-		redisClient:  redisClient,
-		groupName:    "group-" + fmt.Sprint(options.Config.Values().Node),
-		consumerName: "Redis-Consumer-" + fmt.Sprint(options.Config.Values().Node),
+		opts:        options,
+		redisClient: redisClient,
+		startTime:   time.Now(),
 	}
+
 }
 
 func (q *redisQueue) Options() option.Options {
@@ -52,12 +49,6 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 		return err
 	}
 	topic := q.opts.Topic
-	if len(messageBytes) > 1000 {
-		// q.opts.Logger.Debugf(ctx, "publish topic:%s,m:%s", topic, messageBytes[:100])
-
-	} else {
-		// q.opts.Logger.Debugf(ctx, "publish topic:%s,m:%s", topic, messageBytes)
-	}
 
 	err = q.redisClient.XAdd(ctx, &redis.XAddArgs{
 		Stream: string(topic),
@@ -72,116 +63,72 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 	return nil
 }
 
+type RedisSamplingData struct {
+	Msgs        []redis.XMessage
+	ConsumeTime time.Duration
+}
+
 // Consume 开启一个协程，不断地从redis中读取消息
 func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 	var (
 		queueRedis = q.redisClient
 		logger     = q.opts.Logger
 		topic      = q.opts.Topic
+		p          = q.opts.Prometheus
 	)
-	r1, err := queueRedis.XGroupCreateMkStream(ctx, topic, q.groupName, "$").Result()
-	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
-		logger.Warnf(ctx, "Redis-Consume failed to create group:%s,err:%v", q.groupName, err)
-		return err
-	}
-	logger.Debugf(ctx, "create group:%s,rs:%v,err:%v", q.groupName, r1, err)
-
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		logger.Warnf(ctx, "queue-redis consumer panic:%v", r)
-	//	}
-	//	logger.Infof(ctx, "queue-redis consumer end")
-	//}()
-
-	// 假设宕机了10分钟，那么当再次启动时，这10分钟内的消息直接标记为已完成，不再消费
-	lastMessages := queueRedis.XRevRangeN(ctx, topic, "+", "-", 1).Val()
-	if len(lastMessages) > 0 {
-		logger.Debugf(ctx, "mark lastMessages msg:%v", lastMessages[0].ID)
-		_, err = queueRedis.XGroupSetID(ctx, topic, q.groupName, lastMessages[0].ID).Result()
-		if err != nil {
-			logger.Warnf(ctx, "Redis-Consume failed to ack lastMessages msg:%s,err:%v", lastMessages[0].ID, err)
-			return err
-		}
-	}
+	// logger.Debugf(ctx, "ServerIP:%s,PublicIP:%s,Redis general consume has started", shared.ServerIP, shared.PublicIP)
 
 	go q.xTrimLoop(ctx)
 
-	var cancel context.CancelFunc
+	var currentID = "$"
+	ch := make(chan RedisSamplingData)
 
-	ctx, cancel = context.WithCancel(ctx)
-	go q.consume(ctx)
-
-	ticker := time.NewTicker(time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			q.mu.RLock()
-			if time.Since(q.lastReceiveTime) < 20*time.Second {
-				q.mu.RUnlock()
-				continue
-			}
-			q.mu.RUnlock()
-			logger.Debugf(ctx, "Redis-Consume beyond lastReceiveTime:%v", q.lastReceiveTime)
-			panic("Redis-Consume beyond lastReceiveTime")
-			cancel()
-			ctx, cancel = context.WithCancel(ctx)
-			go q.consume(ctx)
-		}
-	}
-
-}
-
-func (q *redisQueue) consume(ctx context.Context) {
-	var (
-		queueRedis = q.redisClient
-		logger     = q.opts.Logger
-		topic      = q.opts.Topic
-		p          = q.opts.Prometheus
-	)
+	go kit.Sampling(ch, time.Second*10, 0, func(v RedisSamplingData) {
+		logger.Infof(ctx, "Redis-Consume Has started %v,msg length:%v,consume time:%v ms", time.Since(q.startTime), len(v.Msgs), v.ConsumeTime.Milliseconds())
+	})
 
 	f := func() {
-
 		beginTime := time.Now()
-		q.mu.Lock()
-		q.lastReceiveTime = time.Now()
-		q.mu.Unlock()
-
-		var currentID = ">"
-		streams, err := queueRedis.XReadGroup(ctx, &redis.XReadGroupArgs{
-			Group:    q.groupName,
-			Consumer: q.consumerName,
-			Streams:  []string{string(topic), currentID},
-			Block:    time.Millisecond * 10,
-			Count:    100,
+		streams, err := queueRedis.XRead(ctx, &redis.XReadArgs{
+			Streams: []string{string(topic), currentID},
+			Count:   500,
+			Block:   time.Millisecond * 10,
+			ID:      currentID,
 		}).Result()
 
-		if len(streams) > 1 {
-			logger.Debugf(ctx, "Redis-Consume streams msg length:%v,err:%v", len(streams[0].Messages), err)
-		}
-
+		// 没有消息
 		if err == redis.Nil {
 			// Logger.Debugf(Ctx, "Redis-Consume no msg")
 			return
 		}
-		if err != nil {
-			logger.Warnf(ctx, "Redis-Consume failed to read group:%s,err:%v", q.groupName, err)
+		if len(streams) == 0 {
+			logger.Debugf(ctx, "Redis-Consume  stream length is 0")
+			time.Sleep(time.Second)
 			return
 		}
 
-		//end := shared.TimeoutDetection.Do(time.Second*3, func() {
-		//	logger.Errorf(ctx, "Redis-Consume execut  timeout,msg:%+v", streams[0].Messages)
-		//})
+		if err != nil {
+			logger.Warnf(ctx, "Redis-Consume failed to read:%v", err)
+			return
+		}
+
 		defer func() {
-			//end()
-			logger.Infof(ctx, "Redis-Consume  msg length:%v, exec time %v ms", len(streams[0].Messages), time.Since(beginTime).Milliseconds())
+			ch <- RedisSamplingData{
+				Msgs:        streams[0].Messages,
+				ConsumeTime: time.Since(beginTime),
+			}
 
 			averageTime := time.Since(beginTime).Milliseconds() / int64(len(streams[0].Messages))
 			if averageTime == 0 {
 				averageTime = 1
 			}
-			_ = p.GetObserve(wsprometheus.MetricQueueHandleDuration, []string{topic}, float64(averageTime))
+			if p.Get(wsprometheus.MetricQueueHandleDuration) != nil {
+				_ = p.GetObserve(wsprometheus.MetricQueueHandleDuration, []string{topic}, float64(averageTime))
+			}
 
-			_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueHandleTotal, []string{"redis"}, float64(len(streams[0].Messages)))
+			if p.Get(wsprometheus.MetricQueueHandleTotal) != nil {
+				_ = p.GetAdd(wsprometheus.MetricQueueHandleTotal, []string{"redis"}, float64(len(streams[0].Messages)))
+			}
 		}()
 
 		for _, msg := range streams[0].Messages {
@@ -195,32 +142,30 @@ func (q *redisQueue) consume(ctx context.Context) {
 				logger.Warnf(ctx, "Redis-Consume failed to find handler for msg: %s", concreteMsgString)
 				continue
 			}
-
-			if isAck := q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg); isAck {
-				_, err := queueRedis.XAck(ctx, string(topic), q.groupName, msg.ID).Result()
-				if err != nil {
-					logger.Warnf(ctx, "Redis-Consume failed to ack msg: %s,err:%v", msg.Values["m"].(string), err)
-					continue
-				}
-			} else {
-				logger.Warnf(ctx, "Redis-Consume msg: %s,not ack", msg.Values["m"].(string))
-			}
+			q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg)
+			currentID = msg.ID
 		}
 	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Infof(ctx, "Redis-Consume exit")
 			return
 		default:
+			clear := kit.DoWithTimeout(time.Second*10, func() {
+				panic("redis consume timeout")
+			})
+
 			f()
+			clear()
 		}
 	}
-
 }
 
+// xTrimLoop 每隔30秒执行一次，删除10分钟前的消息
 func (q *redisQueue) xTrimLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Second * 1)
+	ticker := time.NewTicker(time.Second * 30)
 	defer ticker.Stop()
 	for {
 		select {
@@ -228,7 +173,9 @@ func (q *redisQueue) xTrimLoop(ctx context.Context) {
 			return
 		case <-ticker.C:
 			beginTime := time.Now()
-			c, err := q.redisClient.XTrimMaxLenApprox(ctx, q.opts.Topic, 30000, 5000).Result()
+			// 计算10分钟前的时间戳
+			minTime := time.Now().Add(-10 * time.Minute).UnixMilli()
+			c, err := q.redisClient.XTrimMinID(ctx, q.opts.Topic, strconv.FormatInt(minTime, 10)).Result()
 			if err != nil {
 				q.opts.Logger.Warnf(ctx, "xTrimLoop failed to trim err:%v", err)
 				continue

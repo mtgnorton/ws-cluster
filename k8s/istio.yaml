@@ -1,0 +1,134 @@
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: ws-cluster-gateway
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: ws
+      protocol: HTTP
+    hosts:
+    - "ws-cluster.com"
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ws-cluster-vs
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - ws-cluster-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: ws-cluster-service
+        port:
+          number: 8084
+        subset: v1
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: ws-cluster-dr
+spec:
+  host: ws-cluster-service
+  subsets:
+  - name: v1
+    labels:
+      app: ws-cluster
+      version: v1
+  trafficPolicy:
+    connectionPool:
+      http:
+        # maxConnections: 1000
+        http1MaxPendingRequests: 1000
+        idleTimeout: 30m  # HTTP/1.1 连接空闲超时
+      tcp:
+        idleTimeout: 1h  # 设置连接空闲超时
+    loadBalancer:
+      simple: LEAST_CONN
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ws-cluster-service
+spec:
+  selector:
+    app: ws-cluster
+  type: NodePort
+  ports:
+    - name: ws
+      port: 8084
+      targetPort: 8084
+      protocol: TCP
+    - name: http 
+      port: 8085
+      targetPort: 8085
+      protocol: TCP
+    - name: metric
+      port: 9091
+      targetPort: 9091
+      protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ws-cluster-deployment
+spec:
+  replicas: 7
+  selector:
+    matchLabels:
+      app: ws-cluster
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: ws-cluster
+        version: v1
+    spec:
+      containers:
+      - name: ws-cluster
+        image: mtgnorton/ws-cluster:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8084
+          name: ws
+        - containerPort: 8085
+          name: http
+        - containerPort: 9091
+          name: metric 
+        args:
+        - "--queue"
+        - "redis"
+        - "--config"
+        - "config.docker.yaml"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: debug-tools-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: debug-tools
+  template:
+    metadata:
+      labels:
+        app: debug-tools
+    spec:
+      containers:
+      - name: debug-tools
+        image: mtgnorton/debug-tools:latest
+        command: ["sleep", "infinity"]
+
+  

@@ -1,0 +1,73 @@
+# 构建阶段
+FROM golang:alpine AS builder
+
+LABEL stage=gobuilder
+LABEL maintainer="norton"
+
+# 构建参数
+# 应用名称
+ARG APP_NAME
+# 主文件路径
+ARG MAIN_PATH
+
+# 环境变量
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=amd64
+ENV GOPROXY=https://goproxy.cn,direct
+ENV TZ=Asia/Shanghai
+
+# 安装基础工具
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk update --no-cache 
+
+
+WORKDIR /build
+
+# 缓存依赖
+COPY go.mod go.sum ./
+RUN go mod download -x
+
+# 复制源码
+COPY . .
+
+# 构建应用
+RUN go build -x \
+    -o /app/${APP_NAME} ${MAIN_PATH}
+
+# 运行阶段
+FROM alpine:latest
+
+# 重新声明 ARG，因为 ARG 不会从上一阶段继承
+ARG APP_NAME
+ARG APP_PORT
+ARG CONFIG_PATH
+ARG CONFIG_FILE_NAME 
+ARG WORKDIR=/app
+
+# 设置环境变量
+ENV TZ=Asia/Shanghai
+ENV APP_NAME=${APP_NAME}
+ENV CONFIG_FILE_NAME=${CONFIG_FILE_NAME}
+
+WORKDIR ${WORKDIR}
+
+# 安装基础工具和证书
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk update --no-cache && \
+    apk add --no-cache curl tzdata && \
+    cp /usr/share/zoneinfo/${TZ} /etc/localtime && \
+    echo ${TZ} > /etc/timezone && \
+    apk del tzdata
+
+# 复制构建产物
+COPY --from=builder /app/${APP_NAME} .
+COPY ${CONFIG_PATH} ${WORKDIR}/
+
+
+RUN chmod +x ${APP_NAME}
+
+EXPOSE ${APP_PORT}
+
+# 使用 shell 形式的 ENTRYPOINT 以确保变量被正确展开
+ENTRYPOINT ["sh", "-c", "/app/${APP_NAME} $@", "--"]

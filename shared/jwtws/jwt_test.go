@@ -3,7 +3,7 @@ package jwtws
 import (
 	"testing"
 
-	"github.com/mtgnorton/ws-cluster/config"
+	"ws-cluster/config"
 )
 
 // pid 1 uid 1  user  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaWQiOiIxIiwidWlkIjoiMSIsImNsaWVudF90eXBlIjowLCJleHAiOjIxNzk3NDQ0MDYsImlzcyI6IndzLWNsdXN0ZXIifQ.xExWBV4l4L8C6UoDc68DSanzjCQSnJOVJCxyEzxnymU

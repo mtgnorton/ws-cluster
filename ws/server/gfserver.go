@@ -5,15 +5,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/shared/auth"
+	"ws-cluster/shared"
+	"ws-cluster/shared/auth"
+
+	"ws-cluster/clustermessage"
+	"ws-cluster/core/client"
+	"ws-cluster/tools/wsprometheus"
+	"ws-cluster/tools/wssentry"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gfile"
-	"github.com/mtgnorton/ws-cluster/clustermessage"
-	"github.com/mtgnorton/ws-cluster/core/client"
-	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
-	"github.com/mtgnorton/ws-cluster/tools/wssentry"
 )
 
 type gfServer struct {
@@ -96,19 +98,22 @@ func (s *gfServer) connect(r *ghttp.Request) {
 		Type: clustermessage.TypeConnect,
 	})
 
-	fmt.Printf("new client connect:%s\n", c.String())
+	cID, _, _ := c.GetIDs()
+	logger.Infof(ctx, "new client connect:%s", cID)
 
 	s.addMetrics()
-	c.Send(ctx, clustermessage.NewSuccessResp(fmt.Sprintf("connect success:%s", c.String())))
-	for {
 
+	nodeID := shared.GetNodeID()
+	connectMsg := fmt.Sprintf("connect to node:%d success,clientID:%s", nodeID, cID)
+	c.Send(ctx, clustermessage.NewSuccessResp(connectMsg))
+
+	for {
 		//if hub := wssentry.GetHubFromContext(r); hub != nil {
 		//	hub.WithScope(func(scope *sentry.Scope) {
 		//		scope.SetExtra("gf_sentry_key˚", "11111")
 		//	})
 		//}
 		_, msgBytes, err := socket.ReadMessage()
-
 		if err != nil {
 			logger.Infof(ctx, "Websocket Read err: %v", err)
 			fmt.Printf("client disconnect:%s\n", c.String())
@@ -116,7 +121,9 @@ func (s *gfServer) connect(r *ghttp.Request) {
 			s.opts.handler.Handle(ctx, c, &clustermessage.AffairMsg{
 				Type: clustermessage.TypeDisconnect,
 			})
-			err = s.opts.prometheus.GetAdd(wsprometheus.MetricWsConnection, nil, -1)
+			nodeID := shared.GetNodeID()
+			serverIP := shared.ServerIP
+			err = s.opts.prometheus.GetAdd(wsprometheus.MetricWsConnection, []string{fmt.Sprintf("%d", nodeID), serverIP}, -1)
 			if err != nil {
 				logger.Infof(ctx, "Websocket GetAdd err: %v", err)
 			}
@@ -170,6 +177,8 @@ func (s *gfServer) addMetrics() {
 	p := s.opts.prometheus
 	//_ = p.GetAdd(wsprometheus.MetricRequestTotal, nil, 1)
 	//_ = p.GetAdd(wsprometheus.MetricRequestURLTotal, []string{"ws", "200"}, 1)
-	_ = p.GetAdd(wsprometheus.MetricWsConnection, nil, 1)
+	nodeID := shared.GetNodeID()
+	serverIP := shared.ServerIP
+	_ = p.GetAdd(wsprometheus.MetricWsConnection, []string{fmt.Sprintf("%d", nodeID), serverIP}, 1)
 
 }

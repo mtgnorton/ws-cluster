@@ -3,7 +3,7 @@ package logger
 import (
 	"context"
 
-	"github.com/mtgnorton/ws-cluster/config"
+	"ws-cluster/config"
 )
 
 var DefaultLogger Logger = NewZapLogger(config.DefaultConfig)

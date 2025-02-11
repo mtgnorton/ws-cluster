@@ -2,21 +2,24 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/util/gutil"
 
-	"github.com/mtgnorton/ws-cluster/shared/auth"
+	"ws-cluster/shared"
+	"ws-cluster/shared/auth"
 
-	"github.com/mtgnorton/ws-cluster/clustermessage"
-	"github.com/mtgnorton/ws-cluster/core/client"
+	"ws-cluster/clustermessage"
+	"ws-cluster/core/client"
+
+	"ws-cluster/tools/wsprometheus"
+	"ws-cluster/tools/wssentry"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
-	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
-	"github.com/mtgnorton/ws-cluster/tools/wssentry"
 )
 
 type gfServer struct {
@@ -72,6 +75,15 @@ func (g gfServer) Run() {
 			if err != nil {
 				g.opts.logger.Infof(ctx, "add metric error:%s", err.Error())
 			}
+		})
+
+		group.GET("/reset_metrics", func(r *ghttp.Request) {
+			nodeID := shared.GetNodeID()
+			serverIP := shared.ServerIP
+			p := g.opts.prometheus.Get(wsprometheus.MetricWsConnection)
+			p.Reset([]string{fmt.Sprintf("%d", nodeID), serverIP})
+
+			r.Response.WriteJson(clustermessage.NewSuccessResp(fmt.Sprintf("%d,%s reset success", nodeID, serverIP)))
 		})
 	})
 

@@ -3,16 +3,16 @@ package option
 import (
 	"context"
 
-	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
+	"ws-cluster/tools/wsprometheus"
 
-	"github.com/mtgnorton/ws-cluster/clustermessage"
-	"github.com/mtgnorton/ws-cluster/core/queue/qtype"
+	"ws-cluster/clustermessage"
+	"ws-cluster/core/queue/qtype"
 
-	"github.com/mtgnorton/ws-cluster/logger"
+	"ws-cluster/logger"
 
-	"github.com/mtgnorton/ws-cluster/config"
+	"ws-cluster/config"
 
-	"github.com/mtgnorton/ws-cluster/core/queue/handler"
+	"ws-cluster/core/queue/handler"
 )
 
 type Options struct {

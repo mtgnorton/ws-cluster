@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/message/queuemessage"
+	"ws-cluster/message/queuemessage"
 )
 
 func TestKafkaQueue(t *testing.T) {

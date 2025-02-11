@@ -1,6 +1,6 @@
 # et 代表可以通过环境变量和命令参数覆盖的配置项,命令行参数优先级大于环境变量
 env: local #et(WS_ENV,env)  local, dev, prod
-node: 100 #et(WS_NODE,node) 节点编号
+node:  #et(WS_NODE,node) 节点编号,为空自动生成
 router:
   enable: false # 如果为true，会向路由服务地址发起注册请求
   addr: http://localhost:9696/register #t(router_addr) 路由服务地址
@@ -21,7 +21,7 @@ queue:
     broker: localhost:7093
     version: 3.2.0
 log:
-  path: /Users/mtgnorton/Coding/go/src/github.com/mtgnorton/ws-cluster/logs
+  path: /Users/mtgnorton/Coding/go/src/ws-cluster/logs
   print: true # 是否打印日志
   level: debug # 日志级别 debug, info, warn, error,dpanic, panic, fatal
   max_age: 7 # 日志保存天数

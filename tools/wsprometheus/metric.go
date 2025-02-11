@@ -27,6 +27,13 @@ type Metric struct {
 	collector   prometheus.Collector
 }
 
+func (m *Metric) Reset(labelValues []string) {
+	switch m.Type {
+	case Gauge:
+		m.collector.(*prometheus.GaugeVec).WithLabelValues(labelValues...).Set(0)
+	}
+}
+
 //func (m *Metric) Inc(labelValues []string) (err error) {
 //	switch m.Type {
 //	case Counter:

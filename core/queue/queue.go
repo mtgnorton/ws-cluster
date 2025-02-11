@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"github.com/mtgnorton/ws-cluster/clustermessage"
-	"github.com/mtgnorton/ws-cluster/config"
+	"ws-cluster/clustermessage"
+	"ws-cluster/config"
 
-	"github.com/mtgnorton/ws-cluster/core/queue/option"
+	"ws-cluster/core/queue/option"
 )
 
 var QueueInstance Queue
@@ -36,6 +36,8 @@ type QueueType string
 const (
 	QueueTypeRedis = "redis"
 
+	QueueTypeRedisGroup = "redis_group"
+
 	QueueTypeKafka = "kafka"
 )
 
@@ -43,9 +45,12 @@ var once sync.Once
 
 func GetQueueInstance(c config.Config) Queue {
 	once.Do(func() {
-		if c.Values().Queue.Use == QueueTypeKafka {
+		switch c.Values().Queue.Use {
+		case QueueTypeKafka:
 			QueueInstance = NewKafkaQueue(option.WithConfig(c))
-		} else {
+		case QueueTypeRedisGroup:
+			QueueInstance = NewRedisGroupQueue(option.WithConfig(c))
+		default:
 			QueueInstance = NewRedisQueue(option.WithConfig(c))
 		}
 	})

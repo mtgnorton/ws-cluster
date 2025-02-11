@@ -23,3 +23,8 @@ go.work
 logs
 
 ws-cluster
+
+bin/
+
+conf/*
+!conf/config.yaml

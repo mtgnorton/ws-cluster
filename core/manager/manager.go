@@ -3,15 +3,15 @@ package manager
 import (
 	"context"
 
-	"github.com/mtgnorton/ws-cluster/core/client"
+	"ws-cluster/core/client"
 )
 
 var DefaultManager = NewManager()
 
-type ProjectServerClients struct {
+type ProjectAllClients struct {
 	PID     string
-	Servers []client.Client
-	Clients []client.Client
+	Servers []client.Client // 服务端
+	Clients []client.Client // 用户端
 }
 
 // Manager 客户端管理
@@ -34,10 +34,10 @@ type Manager interface {
 	ServersByPID(ctx context.Context, projectID string) []client.Client
 
 	// Projects 获取所有项目的服务客户端和用户客户端
-	Projects(ctx context.Context) []ProjectServerClients
+	Projects(ctx context.Context) []ProjectAllClients
 
 	// Admins 获取所有管理客户端
-	Admins(ctx context.Context) []client.Client
+	// Admins(ctx context.Context) []client.Client
 
 	// Exist 判断客户端是否存在
 	Exist(ctx context.Context, clientID string) bool

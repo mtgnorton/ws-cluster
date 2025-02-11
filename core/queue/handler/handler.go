@@ -3,7 +3,7 @@ package handler
 import (
 	"context"
 
-	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"ws-cluster/clustermessage"
 )
 
 var DefaultPushHandler = NewSendToUserHandler()

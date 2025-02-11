@@ -2,14 +2,17 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/getsentry/sentry-go"
 
+	"ws-cluster/config"
+	"ws-cluster/shared"
+	"ws-cluster/tools/wssentry"
+
 	"github.com/TheZeroSlave/zapsentry"
-	"github.com/mtgnorton/ws-cluster/config"
-	"github.com/mtgnorton/ws-cluster/tools/wssentry"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -22,60 +25,68 @@ type ZapLogger struct {
 func NewZapLogger(config config.Config) Logger {
 	return &ZapLogger{logger: newZapLogger(config)}
 }
+
 func (z ZapLogger) Debug(ctx context.Context, args ...interface{}) {
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
 	z.logger.Debug(args...)
 }
 
 func (z ZapLogger) Debugf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Debugf(template, args...)
+	z.logger.Debugf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
 }
 
 func (z ZapLogger) Info(ctx context.Context, args ...interface{}) {
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
 	z.logger.Info(args...)
 }
 
 func (z ZapLogger) Infof(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Infof(template, args...)
+	z.logger.Infof(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
 }
 
 func (z ZapLogger) Warn(ctx context.Context, args ...interface{}) {
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
 	z.logger.Warn(args...)
 }
 
 func (z ZapLogger) Warnf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Warnf(template, args...)
+	z.logger.Warnf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
 }
 
 func (z ZapLogger) Error(ctx context.Context, args ...interface{}) {
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
 	z.logger.Error(args...)
 }
 
 func (z ZapLogger) Errorf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Errorf(template, args...)
+	z.logger.Errorf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
 }
 
 func (z ZapLogger) Fatal(ctx context.Context, args ...interface{}) {
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
 	z.logger.Fatal(args...)
 }
 
 func (z ZapLogger) Fatalf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Fatalf(template, args...)
+	z.logger.Fatalf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
 }
 
 func (z ZapLogger) DPanic(ctx context.Context, args ...interface{}) {
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
 	z.logger.DPanic(args...)
 }
 
 func (z ZapLogger) DPanicf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.DPanicf(template, args...)
+	z.logger.DPanicf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
 }
 
 func (z ZapLogger) Panic(ctx context.Context, args ...interface{}) {
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
 	z.logger.Panic(args...)
 }
 
 func (z ZapLogger) Panicf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Panicf(template, args...)
+	z.logger.Panicf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
 }
 
 func newZapLogger(config config.Config) *zap.SugaredLogger {

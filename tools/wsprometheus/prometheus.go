@@ -37,6 +37,13 @@ func (p *Prometheus) Init() {
 	})
 }
 
+func (p *Prometheus) Get(metric string) *Metric {
+	if !p.isEnable() {
+		return nil
+	}
+	return p.opts.MetricManager.Get(metric)
+}
+
 func (p *Prometheus) GetAdd(metric string, labelValues []string, value float64) (err error) {
 	if !p.isEnable() {
 		return
@@ -79,6 +86,7 @@ func (p *Prometheus) init() {
 	_ = p.opts.MetricManager.Add(&Metric{
 		Type:        Gauge,
 		Name:        MetricWsConnection,
+		Labels:      []string{"node", "ip"},
 		Description: "current ws connection num.",
 	})
 
