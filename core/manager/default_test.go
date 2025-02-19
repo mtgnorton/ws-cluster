@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"ws-cluster/core/client"
+	"ws-cluster/shared/kit"
+
+	"golang.org/x/exp/rand"
 )
 
 // TestConcurrentAccess 测试并发访问时的锁竞争情况
@@ -114,4 +117,74 @@ func (m *mockClient) Close() {}
 
 func (m *mockClient) String() string {
 	return m.id
+}
+
+func (m *mockClient) GetCID() string {
+	return m.id
+}
+
+func (m *mockClient) GetUID() string {
+	return m.uid
+}
+
+func (m *mockClient) GetPID() string {
+	return m.pid
+}
+
+func TestBatchRemoveAndQuery(t *testing.T) {
+	var (
+		ctx     = context.Background()
+		m       = NewManager()
+		clients = make([]client.Client, 10000)
+	)
+
+	// 创建一万个模拟客户端并加入管理器
+	for i := 0; i < 10000; i++ {
+		clients[i] = &mockClient{
+			id:  fmt.Sprintf("client-%d", i),
+			uid: fmt.Sprintf("user-%d", i),
+			pid: "test-project",
+		}
+		m.Join(ctx, clients[i])
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// 协程1: 批量删除客户端
+	go func() {
+		defer wg.Done()
+		var wg2 sync.WaitGroup
+		wg2.Add(100)
+		for i := 0; i < 100; i++ { // 启动100个协程
+			go func(start int) {
+				defer wg2.Done()
+				// 直接计算每个协程需要处理的起始和结束索引
+				begin := start * 100
+				end := begin + 100
+				if end > 10000 {
+					end = 10000
+				}
+				// 移除指定范围内的客户端
+				for j := begin; j < end; j++ {
+					m.Remove(ctx, clients[j])
+				}
+			}(i)
+		}
+		wg2.Wait()
+	}()
+
+	// 协程2: 持续查询客户端
+	go func() {
+		defer wg.Done()
+		timeConsume := kit.ConsumeTimeStaistics("manager-Clients")
+		for i := 0; i < 100; i++ { // 查询100次
+			clientID := fmt.Sprintf("client-%d", rand.Intn(10000))
+			m.Clients(ctx, clientID)
+			t.Log(timeConsume(fmt.Sprintf("manager-Clients-%d", i)))
+		}
+	}()
+
+	wg.Wait()
+	fmt.Println(111)
 }

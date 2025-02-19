@@ -20,6 +20,8 @@ var NodeIDWorker *kit.NodeIDWorker
 var ServerIP string = "unknown"
 var PublicIP string = "unknown"
 
+var ipOnce sync.Once
+
 var NodeID int64
 var nodeIDSyncOnce sync.Once
 
@@ -33,6 +35,12 @@ func InitIP() {
 	if err != nil {
 		fmt.Printf("获取公网IP失败:%v\n", err)
 	}
+}
+
+func GetIP() (string, string) {
+	ipOnce.Do(InitIP)
+	return ServerIP, PublicIP
+
 }
 
 // var DefaultJwtWs *jwtws.JwtWs = jwtws.NewJwtWs(config.DefaultConfig)

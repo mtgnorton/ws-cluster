@@ -45,6 +45,9 @@ type Client interface {
 	UpdateInteractTime()
 	GetInteractTime() int64
 	GetIDs() (cid string, uid string, pid string)
+	GetCID() string
+	GetUID() string
+	GetPID() string
 	Type() CType
 	String() string
 }

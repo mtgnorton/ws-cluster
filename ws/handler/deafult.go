@@ -6,6 +6,7 @@ import (
 
 	"ws-cluster/clustermessage"
 	"ws-cluster/core/client"
+	"ws-cluster/shared/kit"
 )
 
 type WsHandler struct {
@@ -32,7 +33,7 @@ func (w *WsHandler) sendClientsLoop() {
 		ctx    = w.opts.ctx
 		logger = w.opts.logger
 	)
-	for range time.Tick(2 * time.Second) {
+	for range time.Tick(10 * time.Second) {
 		// 获取所有的用户端的连接信息
 		// 遍历所有的服务端
 		// 发送给服务端
@@ -48,22 +49,25 @@ func (w *WsHandler) sendClientsLoop() {
 			if len(onlineClients) == 0 {
 				continue
 			}
-			msg := clustermessage.AffairMsg{
-				AffairID: "",
-				AckID:    "",
-				Payload:  onlineClients,
-				Type:     clustermessage.TypeOnlineClients,
-				Source: &clustermessage.Source{
-					PID: projectServerClients.PID,
-					UID: "",
-					CID: "",
-				},
-				To: nil,
-			}
-			err := w.opts.queue.Publish(ctx, &msg)
-			if err != nil {
-				logger.Infof(ctx, "WsHandler-sendClientsLoop publish error %v", err)
-			}
+
+			kit.ChunkSlice(onlineClients, 1000, func(chunkOnlineClients []*OnlineClient) {
+				msg := clustermessage.AffairMsg{
+					AffairID: "",
+					AckID:    "",
+					Payload:  chunkOnlineClients,
+					Type:     clustermessage.TypeOnlineClients,
+					Source: &clustermessage.Source{
+						PID: projectServerClients.PID,
+						UID: "",
+						CID: "",
+					},
+					To: nil,
+				}
+				err := w.opts.queue.Publish(ctx, &msg)
+				if err != nil {
+					logger.Warnf(ctx, "WsHandler-sendClientsLoop publish error %v", err)
+				}
+			})
 
 		}
 	}
@@ -116,7 +120,7 @@ func (w *WsHandler) handleMsgFromServer(ctx context.Context, c client.Client, ms
 
 	err := queue.Publish(ctx, msg)
 	if err != nil {
-		logger.Infof(ctx, "WsHandler-FromServer publish error %v", err)
+		logger.Warnf(ctx, "WsHandler-FromServer publish error %v", err)
 		return
 	}
 	logger.Debugf(ctx, "WsHandler-FromServer  msg  success,msg:%+v,To:%+v", msg, msg.To)
@@ -136,7 +140,7 @@ func (w *WsHandler) handleMsgFromUser(ctx context.Context, c client.Client, msg 
 	}
 	err := w.opts.queue.Publish(ctx, msg)
 	if err != nil {
-		w.opts.logger.Infof(ctx, "WsHandler-FromUser user publish error %v", err)
+		w.opts.logger.Warnf(ctx, "WsHandler-FromUser user publish error %v", err)
 		return
 	}
 	w.opts.logger.Debugf(ctx, "WsHandler-FromUser  msg  success,msg:%v", msg)

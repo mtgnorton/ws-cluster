@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"ws-cluster/shared"
@@ -16,19 +17,22 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gfile"
+	"github.com/gorilla/websocket"
 )
 
 type gfServer struct {
-	opts   Options
-	server *ghttp.Server
-	sentry *wssentry.Handler
+	opts         Options
+	server       *ghttp.Server
+	sentry       *wssentry.Handler
+	onlineNumber *atomic.Int64
 }
 
 func New(opts ...Option) Server {
 	return &gfServer{
-		opts:   NewOptions(opts...),
-		server: g.Server("ws"),
-		sentry: wssentry.GfSentry,
+		opts:         NewOptions(opts...),
+		server:       g.Server("ws"),
+		sentry:       wssentry.GfSentry,
+		onlineNumber: &atomic.Int64{},
 	}
 }
 
@@ -51,6 +55,9 @@ func (s *gfServer) Run() {
 	s.server.BindHandler("/connect", func(r *ghttp.Request) {
 		s.sentry.RecoverHttp(r, s.connect)
 	})
+	s.server.BindHandler("/health", func(r *ghttp.Request) {
+		r.Response.Write("ok")
+	})
 	s.server.SetServerRoot(gfile.MainPkgPath())
 	s.opts.logger.Debugf(context.Background(), "ws server run on port:%d", s.opts.port)
 	s.server.SetPort(s.opts.port)
@@ -58,7 +65,7 @@ func (s *gfServer) Run() {
 	if s.opts.config.Values().Router.Enable {
 		go s.registerToRegistryLoop()
 	}
-
+	go s.printOnlineNumber()
 	s.server.Run()
 
 }
@@ -71,24 +78,38 @@ func (s *gfServer) connect(r *ghttp.Request) {
 	ctx := r.Context()
 
 	logger := s.opts.logger
-
-	socket, err := r.WebSocket()
-	if err != nil {
-		logger.Debugf(ctx, "Websocket err:%v", err)
-		r.Exit()
-	}
-
 	token := r.Get("token").String()
-
-	// claims, err := shared.DefaultJwtWs.Parse(token)
-
 	userData, err := auth.Decode(token)
+
+	var socket *ghttp.WebSocket
+
 	if err != nil {
+		socket, err = r.WebSocket()
+		if err != nil {
+			logger.Debugf(ctx, "Websocket err:%v", err)
+			r.Exit()
+		}
 		_ = socket.WriteMessage(1, []byte("token error"))
 		_ = socket.Close()
 		logger.Debugf(ctx, "Websocket token is error:%v", err)
 		r.Exit()
+	} else {
+		if userData.ClientType == int(client.CTypeServer) {
+			socket, err = customSizeWebsocket(r, 16384)
+			if err != nil {
+				logger.Debugf(ctx, "Websocket err:%v", err)
+				r.Exit()
+			}
+		} else {
+			socket, err = customSizeWebsocket(r, 2048)
+			if err != nil {
+				logger.Debugf(ctx, "Websocket err:%v", err)
+				r.Exit()
+			}
+		}
 	}
+
+	// claims, err := shared.DefaultJwtWs.Parse(token)
 
 	c := client.NewClient(ctx, userData.UID, userData.PID, client.CType(userData.ClientType), socket.Conn)
 
@@ -107,6 +128,8 @@ func (s *gfServer) connect(r *ghttp.Request) {
 	connectMsg := fmt.Sprintf("connect to node:%d success,clientID:%s", nodeID, cID)
 	c.Send(ctx, clustermessage.NewSuccessResp(connectMsg))
 
+	s.onlineNumber.Add(1)
+
 	for {
 		//if hub := wssentry.GetHubFromContext(r); hub != nil {
 		//	hub.WithScope(func(scope *sentry.Scope) {
@@ -115,7 +138,7 @@ func (s *gfServer) connect(r *ghttp.Request) {
 		//}
 		_, msgBytes, err := socket.ReadMessage()
 		if err != nil {
-			logger.Infof(ctx, "Websocket Read err: %v", err)
+			logger.Debugf(ctx, "Websocket Read err: %v", err)
 			fmt.Printf("client disconnect:%s\n", c.String())
 			s.opts.manager.Remove(ctx, c)
 			s.opts.handler.Handle(ctx, c, &clustermessage.AffairMsg{
@@ -127,6 +150,7 @@ func (s *gfServer) connect(r *ghttp.Request) {
 			if err != nil {
 				logger.Infof(ctx, "Websocket GetAdd err: %v", err)
 			}
+			s.onlineNumber.Add(-1)
 			return
 		}
 
@@ -181,4 +205,27 @@ func (s *gfServer) addMetrics() {
 	serverIP := shared.ServerIP
 	_ = p.GetAdd(wsprometheus.MetricWsConnection, []string{fmt.Sprintf("%d", nodeID), serverIP}, 1)
 
+}
+
+func (s *gfServer) printOnlineNumber() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.opts.logger.Infof(s.opts.ctx, "online number:%d", s.onlineNumber.Load())
+	}
+}
+
+func customSizeWebsocket(r *ghttp.Request, size int) (*ghttp.WebSocket, error) {
+	var upgrader = websocket.Upgrader{
+		WriteBufferSize: size,
+		ReadBufferSize:  size,
+	}
+
+	if conn, err := upgrader.Upgrade(r.Response.Writer, r.Request, nil); err == nil {
+		return &ghttp.WebSocket{
+			Conn: conn,
+		}, nil
+	} else {
+		return nil, err
+	}
 }

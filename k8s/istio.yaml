@@ -47,8 +47,7 @@ spec:
   trafficPolicy:
     connectionPool:
       http:
-        # maxConnections: 1000
-        http1MaxPendingRequests: 1000
+        http1MaxPendingRequests: 10000
         idleTimeout: 30m  # HTTP/1.1 连接空闲超时
       tcp:
         idleTimeout: 1h  # 设置连接空闲超时
@@ -83,13 +82,18 @@ kind: Deployment
 metadata:
   name: ws-cluster-deployment
 spec:
-  replicas: 7
+  replicas: 8
   selector:
     matchLabels:
       app: ws-cluster
       version: v1
   template:
     metadata:
+      annotations:
+        prometheus.istio.io/merge-metrics: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
       labels:
         app: ws-cluster
         version: v1

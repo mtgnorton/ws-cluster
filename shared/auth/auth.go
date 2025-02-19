@@ -37,7 +37,6 @@ func Decode(s string, key ...string) (*UserData, error) {
 	}
 
 	d := string(r)
-	fmt.Println(d)
 	arr := strings.Split(d, "@")
 	if len(arr) != 3 {
 		return nil, ErrFormat

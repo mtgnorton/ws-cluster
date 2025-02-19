@@ -179,7 +179,7 @@ func (q *redisGroupQueue) consume(ctx context.Context) {
 			}
 			_ = p.GetObserve(wsprometheus.MetricQueueHandleDuration, []string{topic}, float64(averageTime))
 
-			_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueHandleTotal, []string{"redis"}, float64(len(streams[0].Messages)))
+			_ = p.GetAdd(wsprometheus.MetricQueueOut, []string{topic}, float64(len(streams[0].Messages)))
 		}()
 
 		for _, msg := range streams[0].Messages {
