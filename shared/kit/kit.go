@@ -137,9 +137,9 @@ func ConsumeTimeStaistics(name string) func(label string) string {
 	startTime := time.Now()
 	times := []time.Time{}
 	return func(label string) string {
-		s := fmt.Sprintf("[%s] %s: It took %s relative to the start time", name, label, time.Since(startTime))
+		s := fmt.Sprintf("[%s] %s: Relative start time: %s", name, label, time.Since(startTime))
 		if len(times) > 0 {
-			s += fmt.Sprintf(" and %s relative to the previous record", time.Since(times[len(times)-1]))
+			s += fmt.Sprintf(" Relative previous time: %s", time.Since(times[len(times)-1]))
 		}
 		times = append(times, time.Now())
 		return s

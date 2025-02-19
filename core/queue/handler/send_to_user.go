@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"ws-cluster/clustermessage"
+	"ws-cluster/core/client"
 	"ws-cluster/shared/kit"
 )
 
@@ -33,7 +34,7 @@ func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) 
 	logger, manager, isAck := h.opts.logger, h.opts.manager, true
 	pid, uids, cids := to.PID, to.UIDs, to.CIDs
 
-	end := kit.DoWithTimeout(time.Second*3, func() {
+	end := kit.DoWithTimeout(time.Second*5, func() {
 		logger.Errorf(ctx, "QueueHandler SendToUser Handle msg timeout,msg:%+v", msg)
 	})
 	defer end()
@@ -43,22 +44,20 @@ func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) 
 		return
 	}
 
-	finalClients := manager.ClientsByPIDs(ctx, pid)
-	if len(finalClients) == 0 {
-		logger.Debugf(ctx, "QueueHandler SendToUser msg pid %s not found,msg:%+v,from:%+v,to:%+v", pid, msg.Payload, source, to)
-		return
-	}
-	if len(uids) > 0 {
-		uClients := manager.ClientsByUIDs(ctx, pid, uids...)
-		// 求交集
-		finalClients = intersect(finalClients, uClients)
-	}
+	var finalClients []client.Client
 
-	if len(cids) > 0 {
-		clients := manager.Clients(ctx, cids...)
-		finalClients = intersect(finalClients, clients)
+	if len(uids) == 0 && len(cids) == 0 {
+		finalClients = manager.ClientsByPIDs(ctx, pid)
+	} else {
+		if len(uids) > 0 {
+			uClients := manager.ClientsByUIDs(ctx, pid, uids...)
+			finalClients = kit.SliceUnion(finalClients, uClients)
+		}
+		if len(cids) > 0 {
+			clients := manager.Clients(ctx, cids...)
+			finalClients = kit.SliceUnion(finalClients, clients)
+		}
 	}
-
 	if len(finalClients) == 0 {
 		logger.Debugf(ctx, "QueueHandler SendToUser msg not found client,msg:%+v,from:%+v,to:%+v", msg.Payload, source, to)
 		return

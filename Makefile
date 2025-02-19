@@ -3,11 +3,13 @@
 NAME = "ws-cluster"
 
 build:
-	go build -x -o $(NAME) main.go
+	go build -x -o bin/$(NAME) main.go
 build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -x -o bin/$(NAME)-linux main.go
 kill:
 	kill -9 `ps -ef | grep $(NAME) | grep -v grep | awk '{print $$2}'`;
+run-local:build
+	./bin/$(NAME) --queue redis  --env local 
 run-dev:
 	nohup ./$(NAME) --queue redis  --env dev  &
 run-prod:
@@ -43,3 +45,8 @@ restart-k8s:
 	kubectl rollout restart deployment/ws-cluster-deployment
 
 bp-restart:bp-docker restart-k8s
+
+scp:build-linux
+	scp bin/ws-cluster-linux  wt:/home/ws-cluster/
+scp-config:
+	scp conf/config-linux.yaml wt:/home/ws-cluster/

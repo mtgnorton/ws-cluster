@@ -3,14 +3,26 @@ package client
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
+	"ws-cluster/logger"
 	"ws-cluster/shared"
+	"ws-cluster/shared/kit"
 
 	"github.com/sasha-s/go-deadlock"
 
 	"github.com/gorilla/websocket"
 )
+
+var allClientSendStatistics atomic.Int64
+var allClientSendStatisticsCh = make(chan *atomic.Int64)
+
+func init() {
+	go kit.Sampling(allClientSendStatisticsCh, time.Second*10, 0, func(v *atomic.Int64) {
+		logger.DefaultLogger.Infof(context.Background(), "client send statistics:%v", v.Load())
+	})
+}
 
 type defaultClient struct {
 	opts             *Options
@@ -45,11 +57,11 @@ func (c *defaultClient) Options() Options {
 //}
 
 func (c *defaultClient) Send(ctx context.Context, message interface{}) {
-	defer func() {
-		if err := recover(); err != nil {
-			c.opts.logger.Debugf(ctx, "send message recover err:%v", err)
-		}
-	}()
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		c.opts.logger.Warnf(ctx, "send message recover err:%v", err)
+	// 	}
+	// }()
 	c.RLock()
 	defer c.RUnlock()
 
@@ -61,8 +73,7 @@ func (c *defaultClient) Send(ctx context.Context, message interface{}) {
 		return
 	case c.messageChan <- message:
 	default:
-
-		c.opts.logger.Debugf(ctx, "client:%s,send message:%v failed", c, message)
+		c.opts.logger.Warnf(ctx, "client:%s,send message:%v ,channel is full,dropped", c, message)
 	}
 }
 
@@ -102,6 +113,24 @@ func (c *defaultClient) GetIDs() (id string, uid string, pid string) {
 	return c.ID, c.UID, c.PID
 }
 
+func (c *defaultClient) GetCID() string {
+	c.RLock()
+	defer c.RUnlock()
+	return c.ID
+}
+
+func (c *defaultClient) GetUID() string {
+	c.RLock()
+	defer c.RUnlock()
+	return c.UID
+}
+
+func (c *defaultClient) GetPID() string {
+	c.RLock()
+	defer c.RUnlock()
+	return c.PID
+}
+
 func (c *defaultClient) Type() CType {
 	c.RLock()
 	defer c.RUnlock()
@@ -117,13 +146,15 @@ func (c *defaultClient) sendLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			c.opts.logger.Debugf(ctx, "send loop done")
+			c.opts.logger.Debugf(ctx, "client:%s send loop done", c.ID)
 			return
 		case message := <-c.messageChan:
 			if err := c.socket.WriteJSON(message); err != nil {
-				c.opts.logger.Debugf(ctx, "send message error:%v", err)
+				c.opts.logger.Debugf(ctx, "client:%s send message error:%v", c.ID, err)
 				return
 			}
+			allClientSendStatistics.Add(1)
+			allClientSendStatisticsCh <- &allClientSendStatistics
 		}
 	}
 }
@@ -134,6 +165,10 @@ func NewClient(ctx context.Context, uid string, pid string, cType CType, socket 
 	options = append(options, WithContext(ctx))
 
 	opts := NewOptions(options...)
+	messageChan := make(chan interface{})
+	if cType == CTypeServer {
+		messageChan = make(chan interface{}, 20000)
+	}
 	c := &defaultClient{
 		opts:        opts,
 		ID:          shared.SnowflakeNode.Generate().String(),
@@ -142,7 +177,7 @@ func NewClient(ctx context.Context, uid string, pid string, cType CType, socket 
 		cancel:      cancel,
 		cType:       cType,
 		socket:      socket,
-		messageChan: make(chan interface{}),
+		messageChan: messageChan,
 	}
 
 	go c.sendLoop(ctx)

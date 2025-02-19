@@ -13,8 +13,10 @@ const (
 	MetricRequestDuration = "request_duration"
 	MetricWsConnection    = "ws_connection"
 
-	MetricQueueHandleDuration = "queue_handle_duration"
-	MetricQueueHandleTotal    = "queue_handle_total"
+	MerticQueueEnter = "queue_enter" // 统计进入队列的消息数量
+	MetricQueueOut   = "queue_out"   // 统计出队列的消息数量
+
+	MetricQueueHandleDuration = "queue_handle_duration" // 统计队列处理消息的时间
 )
 
 var DefaultPrometheus = New()
@@ -91,17 +93,24 @@ func (p *Prometheus) init() {
 	})
 
 	_ = p.opts.MetricManager.Add(&Metric{
-		Type:        Histogram,
-		Name:        MetricQueueHandleDuration,
-		Description: "queue handle msg duration.",
-		Labels:      []string{"queue_type"},
-		Buckets:     []float64{10, 30, 60, 100, 200, 500, 1000},
+		Type:        Counter,
+		Name:        MetricQueueOut,
+		Description: "queue handle msg  num",
+		Labels:      []string{"node", "ip"},
 	})
 	_ = p.opts.MetricManager.Add(&Metric{
 		Type:        Counter,
-		Name:        MetricQueueHandleTotal,
-		Description: "queue handle msg  num",
-		Labels:      []string{"queue_type"},
+		Name:        MerticQueueEnter,
+		Description: "queue enter msg  num",
+		Labels:      []string{"node", "ip"},
+	})
+
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Histogram,
+		Name:        MetricQueueHandleDuration,
+		Description: "queue handle msg duration.",
+		Labels:      []string{"node", "ip"},
+		Buckets:     []float64{10, 30, 60, 100, 200, 500, 1000},
 	})
 
 	http.Handle(p.opts.Config.Values().Prometheus.Path, promhttp.Handler())

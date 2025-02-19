@@ -44,8 +44,10 @@ func main() {
 	if c.Values().Env == config.Prod {
 		deadlock.Opts.Disable = true
 	}
+	deadlock.Opts.Disable = true
+
 	shared.InitRedis(c)
-	shared.InitIP()
+	shared.GetIP()
 
 	shared.GetNodeID(c)
 	toolServer(c)
