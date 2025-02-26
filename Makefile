@@ -13,7 +13,7 @@ run-local:build
 run-dev:
 	nohup ./$(NAME) --queue redis  --env dev  &
 run-prod:
-	nohup ./$(NAME) --queue redis  --env prod  &
+	nohup ./$(NAME) --queue redis  --config conf/config.prod.yaml --env prod  &
 ps:
 	ps -ef | grep $(NAME)
 tail-log:
@@ -47,6 +47,6 @@ restart-k8s:
 bp-restart:bp-docker restart-k8s
 
 scp:build-linux
-	scp bin/ws-cluster-linux  trade-official:/home/ws-cluster/
+	scp bin/ws-cluster-linux  trade-official:/home/ws-cluster/ws-cluster
 scp-config:
 	scp conf/config-linux.yaml trade-official:/home/ws-cluster/
