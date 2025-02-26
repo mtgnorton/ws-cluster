@@ -11,9 +11,9 @@ kill:
 run-local:build
 	./bin/$(NAME) --queue redis  --env local 
 run-dev:
-	nohup ./$(NAME) --queue redis  --env dev  &
+	nohup ./bin/$(NAME) --queue redis  --env dev  &
 run-prod:
-	nohup ./$(NAME) --queue redis  --config conf/config.prod.yaml --env prod  &
+	nohup ./bin/$(NAME) --queue redis  --config conf/config.prod.yaml --env prod  &
 ps:
 	ps -ef | grep $(NAME)
 tail-log:
