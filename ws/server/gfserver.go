@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync/atomic"
 	"time"
 
@@ -219,6 +220,9 @@ func customSizeWebsocket(r *ghttp.Request, size int) (*ghttp.WebSocket, error) {
 	var upgrader = websocket.Upgrader{
 		WriteBufferSize: size,
 		ReadBufferSize:  size,
+		CheckOrigin: func(r *http.Request) bool {
+			return true // 允许所有来源
+		},
 	}
 
 	if conn, err := upgrader.Upgrade(r.Response.Writer, r.Request, nil); err == nil {
