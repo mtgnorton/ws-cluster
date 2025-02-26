@@ -82,7 +82,7 @@ kind: Deployment
 metadata:
   name: ws-cluster-deployment
 spec:
-  replicas: 8
+  replicas: 3
   selector:
     matchLabels:
       app: ws-cluster
@@ -109,30 +109,52 @@ spec:
           name: http
         - containerPort: 9091
           name: metric 
+        lifecycle:
+          preStop:
+            httpGet:
+              path: /v1/reset_metrics
+              port: 8085
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+
         args:
         - "--queue"
         - "redis"
         - "--config"
-        - "config.docker.yaml"
+        - "config.docker.official.yaml"
 
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: debug-tools-deployment
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: debug-tools
-  template:
-    metadata:
-      labels:
-        app: debug-tools
-    spec:
-      containers:
-      - name: debug-tools
-        image: mtgnorton/debug-tools:latest
-        command: ["sleep", "infinity"]
+# ---
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: debug-tools-deployment
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: debug-tools
+#   template:
+#     metadata:
+#       labels:
+#         app: debug-tools
+#     spec:
+#       containers:
+#       - name: debug-tools
+#         image: mtgnorton/debug-tools:latest
+#         command: ["sleep", "infinity"]
 
   

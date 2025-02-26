@@ -29,8 +29,8 @@ build-docker:build-linux
 	--build-arg "HTTPS_PROXY=http://host.docker.internal:7890/" \
 	--build-arg "APP_NAME=ws-cluster" \
 	--build-arg "MAIN_PATH=main.go" \
-	--build-arg "CONFIG_PATH=conf/config.docker.yaml" \
-	--build-arg "CONFIG_FILE_NAME=config.docker.yaml" \
+	--build-arg "CONFIG_PATH=conf/config.docker.official.yaml" \
+	--build-arg "CONFIG_FILE_NAME=config.docker.official.yaml" \
 	-t mtgnorton/ws-cluster:latest -f Dockerfile .
 
 run-docker:
@@ -47,6 +47,6 @@ restart-k8s:
 bp-restart:bp-docker restart-k8s
 
 scp:build-linux
-	scp bin/ws-cluster-linux  wt:/home/ws-cluster/
+	scp bin/ws-cluster-linux  trade-official:/home/ws-cluster/
 scp-config:
-	scp conf/config-linux.yaml wt:/home/ws-cluster/
+	scp conf/config-linux.yaml trade-official:/home/ws-cluster/

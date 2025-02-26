@@ -34,6 +34,7 @@ type defaultClient struct {
 	socket           *websocket.Conn // 连接
 	lastInteractTime int64
 	messageChan      chan interface{}
+	status           atomic.Int32
 	deadlock.RWMutex
 }
 
@@ -57,42 +58,48 @@ func (c *defaultClient) Options() Options {
 //}
 
 func (c *defaultClient) Send(ctx context.Context, message interface{}) {
-	// defer func() {
-	// 	if err := recover(); err != nil {
-	// 		c.opts.logger.Warnf(ctx, "send message recover err:%v", err)
-	// 	}
-	// }()
-	c.RLock()
-	defer c.RUnlock()
-
-	if c.messageChan == nil {
+	if c.status.Load() == int32(StatusClosed) {
+		c.opts.logger.Debugf(ctx, "client:%s,send message:%v ,client is closed", c, message)
 		return
 	}
+
+	c.RLock()
+	messageChan := c.messageChan
+	c.RUnlock()
+
+	if messageChan == nil {
+		return
+	}
+
 	select {
 	case <-ctx.Done():
 		return
-	case c.messageChan <- message:
+	case messageChan <- message:
 	default:
 		c.opts.logger.Warnf(ctx, "client:%s,send message:%v ,channel is full,dropped", c, message)
 	}
 }
 
 func (c *defaultClient) Close() {
+	if !c.status.CompareAndSwap(int32(StatusNormal), int32(StatusClosed)) {
+		return
+	}
+
 	c.Lock()
 	defer c.Unlock()
-	close(c.messageChan)
+
 	c.cancel()
-	c.messageChan = nil
+
+	if c.messageChan != nil {
+		close(c.messageChan)
+		c.messageChan = nil
+	}
+
 	c.opts.logger.Debugf(context.Background(), "client close:%s", c.ID)
 }
 
 func (c *defaultClient) Status() Status {
-	c.RLock()
-	defer c.RUnlock()
-	if c.messageChan == nil {
-		return StatusClosed
-	}
-	return StatusNormal
+	return Status(c.status.Load())
 }
 
 func (c *defaultClient) UpdateInteractTime() {
@@ -142,17 +149,34 @@ func (c *defaultClient) String() string {
 }
 
 func (c *defaultClient) sendLoop(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.opts.logger.Warnf(ctx, "client:%s sendLoop panic: %v", c.ID, r)
+		}
+	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			c.opts.logger.Debugf(ctx, "client:%s send loop done", c.ID)
+			c.opts.logger.Debugf(ctx, "client:%s send loop done by context", c.ID)
 			return
-		case message := <-c.messageChan:
-			if err := c.socket.WriteJSON(message); err != nil {
-				c.opts.logger.Debugf(ctx, "client:%s send message error:%v", c.ID, err)
+		case message, ok := <-c.messageChan:
+			if !ok {
+				c.opts.logger.Debugf(ctx, "client:%s send loop done by closed channel", c.ID)
 				return
 			}
+
+			if c.status.Load() == int32(StatusClosed) {
+				c.opts.logger.Debugf(ctx, "client:%s is closed, stop sending", c.ID)
+				return
+			}
+
+			if err := c.socket.WriteJSON(message); err != nil {
+				c.opts.logger.Debugf(ctx, "client:%s send message error:%v", c.ID, err)
+				c.status.Store(int32(StatusClosed))
+				return
+			}
+
 			allClientSendStatistics.Add(1)
 			allClientSendStatisticsCh <- &allClientSendStatistics
 		}
@@ -179,7 +203,7 @@ func NewClient(ctx context.Context, uid string, pid string, cType CType, socket 
 		socket:      socket,
 		messageChan: messageChan,
 	}
-
+	c.status.Store(int32(StatusNormal))
 	go c.sendLoop(ctx)
 	return c
 }

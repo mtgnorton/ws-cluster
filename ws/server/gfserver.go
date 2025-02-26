@@ -153,7 +153,7 @@ func (s *gfServer) connect(r *ghttp.Request) {
 			s.onlineNumber.Add(-1)
 			return
 		}
-
+		c.UpdateInteractTime()
 		msg, err := clustermessage.ParseAffair(msgBytes)
 		if err != nil {
 			logger.Infof(ctx, "parse err:%v", err)
