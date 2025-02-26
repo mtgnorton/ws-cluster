@@ -80,7 +80,7 @@ func (w *WsHandler) Handle(ctx context.Context, c client.Client, msg *clustermes
 	// 用户端的连接,断开事件需要通知服务端, 只处理客户端的连接,断开事件
 	// 判断是否是心跳消息
 	if msg.Type == clustermessage.TypeHeart {
-		c.Send(ctx, clustermessage.NewHeartResp(msg))
+		c.Send(ctx, clustermessage.NewHeartResp(msg, c.GetCID()))
 		return
 	}
 

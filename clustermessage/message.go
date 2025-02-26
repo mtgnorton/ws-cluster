@@ -164,14 +164,14 @@ func newResp(ackID string, code int, msg string) AckMsg {
 	}
 }
 
-func NewHeartResp(msg *AffairMsg) AffairMsg {
+func NewHeartResp(msg *AffairMsg, cid string) AffairMsg {
 	return AffairMsg{
 		Type:  TypeHeart,
 		AckID: msg.AckID,
 		Payload: map[string]string{
-			"pong": time.Now().Format("2006-01-02 15:04:05"),
-			// "client_id": msg.Source.CID,
-			"ack_id": msg.AckID,
+			"pong":      time.Now().Format("2006-01-02 15:04:05"),
+			"client_id": cid,
+			"ack_id":    msg.AckID,
 		},
 	}
 }
