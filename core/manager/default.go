@@ -155,13 +155,23 @@ func (m *manager) Exist(ctx context.Context, clientID string) bool {
 	return ok
 }
 
-func (m *manager) inifiniteCheckExpired(ctx context.Context) {
-	m.RLock()
-	defer m.RUnlock()
-	for _, c := range m.clients {
-		if time.Now().Unix()-c.GetInteractTime() > 15 {
-			m.opts.logger.Debugf(ctx, "checkExpired client %s expired", c)
-			m.Remove(ctx, c)
+func (m *manager) infiniteCheckExpired(ctx context.Context) {
+	ticker := time.NewTicker(time.Second * 10)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			m.RLock()
+			for _, c := range m.clients {
+				if time.Now().Unix()-c.GetInteractTime() > 15 {
+					m.opts.logger.Debugf(ctx, "checkExpired client %s expired", c)
+					c.Close()
+				}
+			}
+			m.RUnlock()
 		}
 	}
 }
@@ -173,6 +183,6 @@ func NewManager(opts ...Option) Manager {
 		clients:  make(map[string]client.Client),
 		projects: make(map[string]Project),
 	}
-	go m.inifiniteCheckExpired(context.Background())
+	go m.infiniteCheckExpired(options.ctx)
 	return m
 }

@@ -94,6 +94,7 @@ func (c *defaultClient) Close() {
 		close(c.messageChan)
 		c.messageChan = nil
 	}
+	c.socket.Close()
 
 	c.opts.logger.Debugf(context.Background(), "client close:%s", c.ID)
 }
