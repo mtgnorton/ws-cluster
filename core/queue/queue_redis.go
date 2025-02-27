@@ -24,6 +24,7 @@ type redisQueue struct {
 	consumeTimes atomic.Int64
 	nodeID       int64
 	nodeIP       string
+	timeoutTimes atomic.Int64
 }
 
 func NewRedisQueue(opts ...option.Option) (q Queue) {
@@ -164,11 +165,11 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 			logger.Infof(ctx, "Redis-Consume exit")
 			return
 		default:
-			clear := kit.DoWithTimeout(time.Second*10, func() {
-				panic("redis consume timeout")
+			timeoutDetect := kit.DoWithTimeout(time.Second*10, func() {
+				panic("timeout")
 			})
 			f()
-			clear()
+			timeoutDetect()
 		}
 	}
 }

@@ -7,14 +7,13 @@ import (
 	"github.com/sasha-s/go-deadlock"
 
 	"ws-cluster/core/client"
-	"ws-cluster/shared/kit"
 )
 
 // Project 属于同一个项目的用户和服务端放在同一个Project中
 type Project struct {
 	pid      string
-	uClients map[string][]client.Client // 连接的用户端 key:uid
-	sClients map[string][]client.Client // 连接的服务端 key:uid
+	uClients map[string]map[string]client.Client // 连接的用户端 key:uid->cid->client
+	sClients map[string]map[string]client.Client // 连接的服务端 key:uid->cid->client
 }
 
 // manager 管理所有客户端
@@ -26,7 +25,6 @@ type manager struct {
 }
 
 func (m *manager) Join(ctx context.Context, c client.Client) {
-
 	cid, uid, pid := c.GetIDs()
 	m.Lock()
 	defer m.Unlock()
@@ -34,15 +32,21 @@ func (m *manager) Join(ctx context.Context, c client.Client) {
 	if _, ok := m.projects[pid]; !ok {
 		m.projects[pid] = Project{
 			pid:      pid,
-			uClients: make(map[string][]client.Client),
-			sClients: make(map[string][]client.Client),
+			uClients: make(map[string]map[string]client.Client),
+			sClients: make(map[string]map[string]client.Client),
 		}
 	}
 	switch c.Type() {
 	case client.CTypeServer:
-		m.projects[pid].sClients[uid] = append(m.projects[pid].sClients[uid], c)
+		if _, ok := m.projects[pid].sClients[uid]; !ok {
+			m.projects[pid].sClients[uid] = make(map[string]client.Client)
+		}
+		m.projects[pid].sClients[uid][cid] = c
 	case client.CTypeUser:
-		m.projects[pid].uClients[uid] = append(m.projects[pid].uClients[uid], c)
+		if _, ok := m.projects[pid].uClients[uid]; !ok {
+			m.projects[pid].uClients[uid] = make(map[string]client.Client)
+		}
+		m.projects[pid].uClients[uid][cid] = c
 	}
 	m.opts.logger.Debugf(ctx, "manager-join c %s", c)
 }
@@ -52,21 +56,17 @@ func (m *manager) Remove(ctx context.Context, c client.Client) {
 
 	m.Lock()
 	defer m.Unlock()
+
 	if _, ok := m.clients[cid]; !ok {
 		m.opts.logger.Debugf(ctx, "manager-remove c %s not exist", c)
 		return
 	}
 	delete(m.clients, cid)
-
 	switch c.Type() {
 	case client.CTypeServer:
-		kit.SliceRangeRemoveElements(m.projects[pid].sClients[uid], func(c client.Client) bool {
-			return c.GetCID() == cid
-		})
+		delete(m.projects[pid].sClients[uid], cid)
 	case client.CTypeUser:
-		kit.SliceRangeRemoveElements(m.projects[pid].uClients[uid], func(c client.Client) bool {
-			return c.GetCID() == cid
-		})
+		delete(m.projects[pid].uClients[uid], cid)
 	}
 	c.Close()
 
@@ -99,9 +99,10 @@ func (m *manager) ClientsByUIDs(ctx context.Context, projectID string, userIDs .
 	defer m.RUnlock()
 	var clients []client.Client
 	for _, uid := range userIDs {
-		clients = append(clients, m.projects[projectID].uClients[uid]...)
+		for _, c := range m.projects[projectID].uClients[uid] {
+			clients = append(clients, c)
+		}
 	}
-
 	return clients
 }
 
@@ -110,8 +111,10 @@ func (m *manager) ClientsByPIDs(ctx context.Context, projectIDs ...string) []cli
 	defer m.RUnlock()
 	var clients []client.Client
 	for _, pid := range projectIDs {
-		for _, c := range m.projects[pid].uClients {
-			clients = append(clients, c...)
+		for _, userClients := range m.projects[pid].uClients {
+			for _, c := range userClients {
+				clients = append(clients, c)
+			}
 		}
 	}
 	return clients
@@ -121,11 +124,14 @@ func (m *manager) ServersByPID(ctx context.Context, projectID string) []client.C
 	m.RLock()
 	defer m.RUnlock()
 	var clients []client.Client
-	for _, c := range m.projects[projectID].sClients {
-		clients = append(clients, c...)
+	for _, serverClients := range m.projects[projectID].sClients {
+		for _, c := range serverClients {
+			clients = append(clients, c)
+		}
 	}
 	return clients
 }
+
 func (m *manager) Projects(ctx context.Context) []ProjectAllClients {
 	m.RLock()
 	defer m.RUnlock()
@@ -137,11 +143,15 @@ func (m *manager) Projects(ctx context.Context) []ProjectAllClients {
 			Clients: make([]client.Client, 0),
 			Servers: make([]client.Client, 0),
 		}
-		for _, cc := range project.uClients {
-			ps.Clients = append(ps.Clients, cc...)
+		for _, userClients := range project.uClients {
+			for _, c := range userClients {
+				ps.Clients = append(ps.Clients, c)
+			}
 		}
-		for _, cc := range project.sClients {
-			ps.Servers = append(ps.Servers, cc...)
+		for _, serverClients := range project.sClients {
+			for _, c := range serverClients {
+				ps.Servers = append(ps.Servers, c)
+			}
 		}
 		projects = append(projects, ps)
 	}

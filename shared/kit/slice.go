@@ -1,9 +1,9 @@
 package kit
 
-// SliceRemoveElement 删除切片中的元素
+// SliceRemoveIndex 删除切片中的元素,按照索引删除
 // 如果keepOrder为true,则按照顺序删除,时间复杂度为O(n)
 // 如果keepOrder为false,则将删除的元素与最后一个元素交换,然后删除最后一个元素,时间复杂度为O(1)
-func SliceRemoveElement[T any](slice []T, index int, keepOrder ...bool) []T {
+func SliceRemoveIndex[T any](slice []T, index int, keepOrder ...bool) []T {
 	if len(slice) == 0 {
 		return slice
 	}
@@ -17,7 +17,32 @@ func SliceRemoveElement[T any](slice []T, index int, keepOrder ...bool) []T {
 	return slice[:len(slice)-1]
 }
 
-// SliceRangeRemoveElements 删除切片中满足条件的元素
+// SliceRemoveFirstElement 删除切片中的元素,按照元素删除
+// 如果keepOrder为true,则按照顺序删除,时间复杂度为O(n)
+// 如果keepOrder为false,则将删除的元素与最后一个元素交换,然后删除最后一个元素,时间复杂度为O(1)
+func SliceRemoveFirstElement[T comparable](slice []T, element T, keepOrder ...bool) []T {
+	if len(slice) == 0 {
+		return slice
+	}
+	if len(keepOrder) > 0 && keepOrder[0] {
+		for i, v := range slice {
+			if v == element {
+				return append(slice[:i], slice[i+1:]...)
+			}
+		}
+	}
+	for i, v := range slice {
+		if v == element {
+			slice[i] = slice[len(slice)-1]
+			var zero T
+			slice[len(slice)-1] = zero // 显式置零
+			return slice[:len(slice)-1]
+		}
+	}
+	return slice
+}
+
+// SliceRangeRemoveElements 删除切片中满足条件的元素,按照元素删除
 //
 // 特性	乱序模式	有序模式
 // 时间复杂度	O(n)	O(n)

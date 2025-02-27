@@ -85,3 +85,26 @@ func CauseError(err error) error {
 	}
 	return err
 }
+
+// MultiError 合并多个错误, 如果oldErr为nil, 则返回errs中的第一个非nil错误, 否则返回oldErr和errs的组合
+func MultiError(oldErr error, errs ...error) error {
+	var nonNilErrs []error
+	if oldErr != nil {
+		nonNilErrs = append(nonNilErrs, oldErr)
+	}
+	for _, err := range errs {
+		if err != nil {
+			nonNilErrs = append(nonNilErrs, err)
+		}
+	}
+	if len(nonNilErrs) == 0 {
+		return nil
+	}
+	if len(nonNilErrs) == 1 {
+		return nonNilErrs[0]
+	}
+	return &baseError{
+		msg:          fmt.Sprintf("multiple errors: %v", nonNilErrs),
+		filePosition: GetCallerPosition(2),
+	}
+}

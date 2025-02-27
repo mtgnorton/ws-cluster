@@ -2,43 +2,45 @@ package retry
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
-type retry[T any] struct {
+type retry struct {
 	Ctx       context.Context         // 当Ctx设置了超时时间, 则当Ctx超时后, 会停止重试
 	ErrHandle func(error) (stop bool) // 错误处理函数,可为空,如果返回true, 则停止重试
 	Backoff   *Backoff                // 退避策略,可为空
 }
 
-type RetryOption[T any] func(r *retry[T])
+type RetryOption func(r *retry)
 
-func WithContext[T any](ctx context.Context) RetryOption[T] {
-	return func(r *retry[T]) {
+func WithContext(ctx context.Context) RetryOption {
+	return func(r *retry) {
 		r.Ctx = ctx
 	}
 }
 
-func WithErrHandle[T any](errHandle func(error) (stop bool)) RetryOption[T] {
-	return func(r *retry[T]) {
+func WithErrHandle(errHandle func(error) (stop bool)) RetryOption {
+	return func(r *retry) {
 		r.ErrHandle = errHandle
 	}
 }
 
-func WithBackoff[T any](backoff *Backoff) RetryOption[T] {
-	return func(r *retry[T]) {
+func WithBackoff(backoff *Backoff) RetryOption {
+	return func(r *retry) {
 		r.Backoff = backoff
 	}
 }
 
 // RetryN 重试n次, 如果n<=0, 则n=1
-func RetryN[T any](n int, execFunc func(context.Context) (T, error), opts ...RetryOption[T]) (t T, times int) {
+// 如果ctx设置了超时时间, 则当ctx超时后, 会停止重试
+// 如果ErrHandle设置了错误处理函数, 则当错误处理函数返回true时, 会停止重试
+// Backoff 默认回退时间为 10次序列为100ms 200ms 400ms 800ms 1.6s 3.2s 6.4s 10s 10s 10s
+func RetryN(n int, execFunc func(context.Context) (interface{}, error), opts ...RetryOption) (t interface{}, times int) {
 	var err error
 	if n <= 0 {
 		n = 1
 	}
-	retry := &retry[T]{
+	retry := &retry{
 		Ctx:     context.Background(),
 		Backoff: NewBackoff(),
 	}
@@ -71,7 +73,6 @@ func RetryN[T any](n int, execFunc func(context.Context) (T, error), opts ...Ret
 // wait 等待一定时间, 如果ctx超时, 则返回ctx.Err()
 func wait(ctx context.Context, backoff *Backoff) (err error) {
 	waitTime := backoff.Duration()
-	fmt.Println("waitTime", waitTime)
 	timer := time.NewTimer(waitTime)
 	defer timer.Stop()
 	select {

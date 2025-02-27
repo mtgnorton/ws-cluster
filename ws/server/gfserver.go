@@ -151,7 +151,6 @@ func (s *gfServer) connect(r *ghttp.Request) {
 		_, msgBytes, err := socket.ReadMessage()
 		if err != nil {
 			logger.Debugf(ctx, "Websocket Read err: %v", err)
-			fmt.Printf("client disconnect:%s\n", c.String())
 			s.opts.manager.Remove(ctx, c)
 			s.opts.handler.Handle(ctx, c, &clustermessage.AffairMsg{
 				Type: clustermessage.TypeDisconnect,

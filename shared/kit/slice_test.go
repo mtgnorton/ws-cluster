@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-func TestSliceRemoveElement(t *testing.T) {
+func TestSliceRemoveIndex(t *testing.T) {
 	t.Run("keepOrder", func(t *testing.T) {
 		slice := []int{1, 2, 3, 4, 5}
-		slice = SliceRemoveElement(slice, 1, true)
+		slice = SliceRemoveIndex(slice, 1, true)
 		if len(slice) != 4 {
 			t.Errorf("expect %v, actual %v", 4, len(slice))
 		}
@@ -19,7 +19,7 @@ func TestSliceRemoveElement(t *testing.T) {
 
 	t.Run("notKeepOrder", func(t *testing.T) {
 		slice := []int{1, 2, 3, 4, 5}
-		slice = SliceRemoveElement(slice, 1, false)
+		slice = SliceRemoveIndex(slice, 1, false)
 		if len(slice) != 4 {
 			t.Errorf("expect %v, actual %v", 4, len(slice))
 		}
@@ -27,6 +27,30 @@ func TestSliceRemoveElement(t *testing.T) {
 			t.Errorf("expect %v, actual %v", []int{1, 3, 4, 5}, slice)
 		}
 	})
+}
+
+func TestSliceRemoveFirstElement(t *testing.T) {
+	t.Run("keepOrder", func(t *testing.T) {
+		slice := []int{1, 2, 3, 4, 5}
+		slice = SliceRemoveFirstElement(slice, 1, true)
+		if len(slice) != 4 {
+			t.Errorf("expect %v, actual %v", 4, len(slice))
+		}
+		if slice[0] != 2 || slice[1] != 3 || slice[2] != 4 || slice[3] != 5 {
+			t.Errorf("expect %v, actual %v", []int{2, 3, 4, 5}, slice)
+		}
+	})
+	t.Run("notKeepOrder", func(t *testing.T) {
+		slice := []int{1, 2, 3, 4, 5}
+		slice = SliceRemoveFirstElement(slice, 1, false)
+		if len(slice) != 4 {
+			t.Errorf("expect %v, actual %v", 4, len(slice))
+		}
+		if !slices.Contains(slice, 2) || !slices.Contains(slice, 3) || !slices.Contains(slice, 4) || !slices.Contains(slice, 5) {
+			t.Errorf("expect %v, actual %v", []int{2, 3, 4, 5}, slice)
+		}
+	})
+
 }
 
 func TestSliceRangeRemoveElements(t *testing.T) {
@@ -66,7 +90,7 @@ func BenchmarkSliceRemoveElement(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tmp := make([]int, len(slice))
 			copy(tmp, slice)
-			_ = SliceRemoveElement(tmp, 500, true)
+			_ = SliceRemoveIndex(tmp, 500, true)
 		}
 	})
 
@@ -79,7 +103,7 @@ func BenchmarkSliceRemoveElement(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tmp := make([]int, len(slice))
 			copy(tmp, slice)
-			_ = SliceRemoveElement(tmp, 500, false)
+			_ = SliceRemoveIndex(tmp, 500, false)
 		}
 	})
 

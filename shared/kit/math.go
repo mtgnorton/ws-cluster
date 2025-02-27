@@ -1,3 +1,4 @@
+// Math 提供数学相关函数
 package kit
 
 import (
