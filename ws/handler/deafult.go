@@ -63,6 +63,7 @@ func (w *WsHandler) sendClientsLoop() {
 					},
 					To: nil,
 				}
+				logger.Debugf(ctx, "WsHandler-sendToServer onlineClients msg:%+v", msg)
 				err := w.opts.queue.Publish(ctx, &msg)
 				if err != nil {
 					logger.Warnf(ctx, "WsHandler-sendClientsLoop publish error %v", err)
