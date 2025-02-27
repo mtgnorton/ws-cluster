@@ -1,6 +1,6 @@
 package server
 
-var DefaultHttpServer = New()
+// var _ Server = New()
 
 type Server interface {
 	Name() string

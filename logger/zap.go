@@ -19,85 +19,98 @@ import (
 )
 
 type ZapLogger struct {
-	logger *zap.SugaredLogger
+	options *Options
+	logger  *zap.SugaredLogger
 }
 
-func NewZapLogger(config config.Config) Logger {
-	return &ZapLogger{logger: newZapLogger(config)}
+func NewZapLogger(opts ...Option) Logger {
+	options := NewOptions(opts...)
+	z := &ZapLogger{
+		options: options,
+	}
+	z.logger = z.initLogger()
+	return z
+}
+
+func (z *ZapLogger) Init(opts ...Option) {
+	for _, o := range opts {
+		o(z.options)
+	}
+	z.logger = z.initLogger()
 }
 
 func (z ZapLogger) Debug(ctx context.Context, args ...interface{}) {
-	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.GetInternalIP(), shared.GetNodeID())}, args...)
 	z.logger.Debug(args...)
 }
 
 func (z ZapLogger) Debugf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Debugf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
+	z.logger.Debugf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.GetInternalIP(), shared.GetNodeID()}, args...)...)
 }
 
 func (z ZapLogger) Info(ctx context.Context, args ...interface{}) {
-	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.GetInternalIP(), shared.GetNodeID())}, args...)
 	z.logger.Info(args...)
 }
 
 func (z ZapLogger) Infof(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Infof(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
+	z.logger.Infof(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.GetInternalIP(), shared.GetNodeID()}, args...)...)
 }
 
 func (z ZapLogger) Warn(ctx context.Context, args ...interface{}) {
-	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.GetInternalIP(), shared.GetNodeID())}, args...)
 	z.logger.Warn(args...)
 }
 
 func (z ZapLogger) Warnf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Warnf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
+	z.logger.Warnf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.GetInternalIP(), shared.GetNodeID()}, args...)...)
 }
 
 func (z ZapLogger) Error(ctx context.Context, args ...interface{}) {
-	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.GetInternalIP(), shared.GetNodeID())}, args...)
 	z.logger.Error(args...)
 }
 
 func (z ZapLogger) Errorf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Errorf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
+	z.logger.Errorf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.GetInternalIP(), shared.GetNodeID()}, args...)...)
 }
 
 func (z ZapLogger) Fatal(ctx context.Context, args ...interface{}) {
-	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.GetInternalIP(), shared.GetNodeID())}, args...)
 	z.logger.Fatal(args...)
 }
 
 func (z ZapLogger) Fatalf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Fatalf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
+	z.logger.Fatalf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.GetInternalIP(), shared.GetNodeID()}, args...)...)
 }
 
 func (z ZapLogger) DPanic(ctx context.Context, args ...interface{}) {
-	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.GetInternalIP(), shared.GetNodeID())}, args...)
 	z.logger.DPanic(args...)
 }
 
 func (z ZapLogger) DPanicf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.DPanicf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
+	z.logger.DPanicf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.GetInternalIP(), shared.GetNodeID()}, args...)...)
 }
 
 func (z ZapLogger) Panic(ctx context.Context, args ...interface{}) {
-	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.ServerIP, shared.NodeID)}, args...)
+	args = append([]interface{}{fmt.Sprintf(" [ServerIP:%s,NodeID:%d] ", shared.GetInternalIP(), shared.GetNodeID())}, args...)
 	z.logger.Panic(args...)
 }
 
 func (z ZapLogger) Panicf(ctx context.Context, template string, args ...interface{}) {
-	z.logger.Panicf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.ServerIP, shared.NodeID}, args...)...)
+	z.logger.Panicf(" [ServerIP:%s,NodeID:%d] "+template, append([]interface{}{shared.GetInternalIP(), shared.GetNodeID()}, args...)...)
 }
 
-func newZapLogger(config config.Config) *zap.SugaredLogger {
-	writer := partitionWriter(config)
+func (z ZapLogger) initLogger() *zap.SugaredLogger {
+	writer := partitionWriter(z.options.configLog)
 	// errorWriter := errorWriter(config)
 
 	encoder := encoder()
 
 	var level zapcore.Level
 
-	switch config.Values().Log.Level {
+	switch z.options.configLog.Level {
 	case "debug":
 		level = zapcore.DebugLevel
 	case "info":
@@ -130,11 +143,12 @@ func newZapLogger(config config.Config) *zap.SugaredLogger {
 	tee := zapcore.NewTee(cores...)
 
 	logger := zap.New(tee, zap.AddCaller(), zap.AddCallerSkip(1))
-	err := wssentry.DefaultSentryInstance.Init()
-	if err != nil {
-		panic(err)
-	}
-	if config.Values().Sentry.DSN != "" {
+
+	if z.options.configSentry.DSN != "" {
+		err := wssentry.DefaultSentryInstance.Init()
+		if err != nil {
+			panic(err)
+		}
 		return attachSentry(logger, sentry.CurrentHub().Client()).Sugar()
 	}
 	return logger.Sugar()
@@ -170,8 +184,8 @@ func attachSentry(log *zap.Logger, client *sentry.Client) *zap.Logger {
 	return log.With(zapsentry.NewScope())
 }
 
-func simpleWriter(config config.Config) zapcore.WriteSyncer {
-	lc := config.Values().Log
+func simpleWriter(config config.Log) zapcore.WriteSyncer {
+	lc := config
 
 	if lc.Path != "" {
 		// 去除最后的/
@@ -196,8 +210,8 @@ func simpleWriter(config config.Config) zapcore.WriteSyncer {
 }
 
 //golint:ignore
-func partitionWriter(config config.Config) zapcore.WriteSyncer {
-	lc := config.Values().Log
+func partitionWriter(config config.Log) zapcore.WriteSyncer {
+	lc := config
 
 	if lc.Path != "" {
 		// 去除最后的/

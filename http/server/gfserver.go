@@ -13,6 +13,7 @@ import (
 	"ws-cluster/shared/auth"
 
 	"ws-cluster/clustermessage"
+	"ws-cluster/core/checking"
 	"ws-cluster/core/client"
 
 	"ws-cluster/tools/wsprometheus"
@@ -79,7 +80,7 @@ func (g gfServer) Run() {
 
 		group.GET("/reset_metrics", func(r *ghttp.Request) {
 			nodeID := shared.GetNodeID()
-			serverIP := shared.ServerIP
+			serverIP := shared.GetInternalIP()
 			p := g.opts.prometheus.Get(wsprometheus.MetricWsConnection)
 			p.Reset([]string{fmt.Sprintf("%d", nodeID), serverIP})
 
@@ -122,6 +123,10 @@ func (g gfServer) handler(r *ghttp.Request) {
 	userData, err := auth.Decode(token)
 	if err != nil {
 		r.Response.WriteJson(clustermessage.NewErrorResp("token error"))
+		return
+	}
+	if !checking.DefaultChecking.IsExist(userData.PID) {
+		r.Response.WriteJson(clustermessage.NewErrorResp("PID denied"))
 		return
 	}
 	if userData.ClientType == int(client.CTypeUser) {

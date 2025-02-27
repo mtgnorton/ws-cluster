@@ -6,12 +6,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"ws-cluster/ws/server"
 
 	"ws-cluster/shared"
 
 	httpServer "ws-cluster/http/server"
-
-	"ws-cluster/ws/server"
 
 	"ws-cluster/tools/swagger"
 	"ws-cluster/tools/wsprometheus"
@@ -44,18 +43,13 @@ func main() {
 	if c.Values().Env == config.Prod {
 		deadlock.Opts.Disable = true
 	}
-	deadlock.Opts.Disable = true
-
-	shared.InitRedis(c)
-	shared.GetIP()
-
-	shared.GetNodeID(c)
 	toolServer(c)
 	defer sentry.Flush(time.Second * 3)
+	wsServerInstance := server.New()
+	httpServerInstance := httpServer.New()
+	go wsServerInstance.Run()
 
-	go httpServer.DefaultHttpServer.Run()
-
-	go server.DefaultWsServer.Run()
+	go httpServerInstance.Run()
 	// 程序退出信号处理
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -64,16 +58,16 @@ func main() {
 	// 优雅关闭
 	fmt.Println("正在关闭服务...")
 
-	if shared.NodeIDWorker != nil {
-		shared.NodeIDWorker.Release()
+	if shared.GetNodeIDWorker() != nil {
+		shared.GetNodeIDWorker().Release()
 	}
 	// 关闭HTTP服务器
-	if err := httpServer.DefaultHttpServer.Stop(); err != nil {
+	if err := httpServerInstance.Stop(); err != nil {
 		fmt.Printf("HTTP服务器关闭失败: %v\n", err)
 	}
 
 	// 关闭WebSocket服务器
-	if err := server.DefaultWsServer.Stop(); err != nil {
+	if err := wsServerInstance.Stop(); err != nil {
 		fmt.Printf("WebSocket服务器关闭失败: %v\n", err)
 	}
 

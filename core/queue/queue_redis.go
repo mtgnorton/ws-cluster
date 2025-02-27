@@ -19,7 +19,6 @@ import (
 // 使用xread实现的队列
 type redisQueue struct {
 	opts         option.Options
-	redisClient  *redis.Client
 	startTime    time.Time
 	publishTimes atomic.Int64
 	consumeTimes atomic.Int64
@@ -35,23 +34,10 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 	}()
 	options := option.NewOptions(opts...)
 
-	c := options.Config
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     c.Values().Queue.Redis.Addr,
-		Password: c.Values().Queue.Redis.Password,
-		Username: c.Values().Queue.Redis.User,
-		DB:       c.Values().Queue.Redis.DB,
-		Protocol: 3,
-		// PoolSize:     200,              // 根据并发量调整（建议为最大并发数的 1.5 倍）
-		// MinIdleConns: 50,               // 维持最小空闲连接数
-		// PoolTimeout:  30 * time.Second, // 等待连接池连接的超时时间
-	})
-
-	ip, _ := shared.GetIP()
+	ip := shared.GetInternalIP()
 
 	rq := &redisQueue{
 		opts:         options,
-		redisClient:  redisClient,
 		startTime:    time.Now(),
 		publishTimes: atomic.Int64{},
 		consumeTimes: atomic.Int64{},
@@ -73,7 +59,7 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 	}
 	topic := q.opts.Topic
 
-	err = q.redisClient.XAdd(ctx, &redis.XAddArgs{
+	err = q.opts.RedisClient.XAdd(ctx, &redis.XAddArgs{
 		Stream: string(topic),
 		Values: map[string]interface{}{
 			"m": string(messageBytes),
@@ -98,7 +84,7 @@ type RedisSamplingData struct {
 // Consume 开启一个协程，不断地从redis中读取消息
 func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 	var (
-		queueRedis = q.redisClient
+		queueRedis = q.opts.RedisClient
 		logger     = q.opts.Logger
 		topic      = q.opts.Topic
 		p          = q.opts.Prometheus
@@ -194,7 +180,7 @@ func (q *redisQueue) monitor(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
-			stats := q.redisClient.PoolStats()
+			stats := q.opts.RedisClient.PoolStats()
 			q.opts.Logger.Infof(ctx, "Redis pool stats: TotalConns=%d, IdleConns=%d Hits=%d,Misses=%d Timeouts=%d",
 				stats.TotalConns, stats.IdleConns, stats.Hits, stats.Misses, stats.Timeouts)
 		case <-ctx.Done():
@@ -215,12 +201,12 @@ func (q *redisQueue) xTrimLoop(ctx context.Context) {
 			beginTime := time.Now()
 			// 计算10分钟前的时间戳
 			minTime := time.Now().Add(-10 * time.Minute).UnixMilli()
-			c, err := q.redisClient.XTrimMinID(ctx, q.opts.Topic, strconv.FormatInt(minTime, 10)).Result()
+			c, err := q.opts.RedisClient.XTrimMinID(ctx, q.opts.Topic, strconv.FormatInt(minTime, 10)).Result()
 			if err != nil {
 				q.opts.Logger.Warnf(ctx, "xTrimLoop failed to trim err:%v", err)
 				continue
 			}
-			xLen := q.redisClient.XLen(ctx, q.opts.Topic).Val()
+			xLen := q.opts.RedisClient.XLen(ctx, q.opts.Topic).Val()
 
 			q.opts.Logger.Infof(ctx, "xTrimLoop trim count:%d,remain %d,consume :%v ms", c, xLen, time.Since(beginTime).Milliseconds())
 		}

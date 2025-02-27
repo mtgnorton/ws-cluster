@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"ws-cluster/config"
+	"ws-cluster/core/checking"
 	"ws-cluster/core/manager"
 	"ws-cluster/logger"
 	"ws-cluster/tools/wsprometheus"
@@ -18,23 +19,24 @@ type Options struct {
 	handler    handler.Handle
 	logger     logger.Logger
 	prometheus *wsprometheus.Prometheus
+	checking   *checking.Checking
 	port       int
 }
 
 func NewOptions(opts ...Option) Options {
 
 	options := Options{
-		ctx:        context.TODO(),
+		ctx:        context.Background(),
 		config:     config.DefaultConfig,
 		manager:    manager.DefaultManager,
 		handler:    handler.DefaultHandler,
 		logger:     logger.DefaultLogger,
 		prometheus: wsprometheus.DefaultPrometheus,
+		checking:   checking.DefaultChecking,
 	}
 	for _, o := range opts {
 		o(&options)
 	}
-
 	c := options.config
 	options.port = c.Values().WsServer.Port
 	return options

@@ -196,7 +196,7 @@ func NewClient(ctx context.Context, uid string, pid string, cType CType, socket 
 	}
 	c := &defaultClient{
 		opts:        opts,
-		ID:          shared.SnowflakeNode.Generate().String(),
+		ID:          shared.GetSnowflakeNode().Generate().String(),
 		UID:         uid,
 		PID:         pid,
 		cancel:      cancel,
