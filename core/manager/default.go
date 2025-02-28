@@ -176,6 +176,9 @@ func (m *manager) infiniteCheckExpired(ctx context.Context) {
 		case <-ticker.C:
 			m.RLock()
 			for _, c := range m.clients {
+				if c.Type() != client.CTypeUser {
+					continue
+				}
 				if time.Now().Unix()-c.GetInteractTime() > 15 {
 					m.opts.logger.Debugf(ctx, "checkExpired client %s expired", c)
 					c.Close()
