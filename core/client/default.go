@@ -190,7 +190,7 @@ func NewClient(ctx context.Context, uid string, pid string, cType CType, socket 
 	options = append(options, WithContext(ctx))
 
 	opts := NewOptions(options...)
-	messageChan := make(chan interface{})
+	messageChan := make(chan interface{}, 1000)
 	if cType == CTypeServer {
 		messageChan = make(chan interface{}, 20000)
 	}
