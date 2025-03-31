@@ -119,6 +119,10 @@ func (s *gfServer) connect(r *ghttp.Request) {
 			r.Exit()
 		}
 	}
+	// todo 后续独立版去掉
+	if userData.PID == "66" {
+		userData.PID = "77"
+	}
 
 	// claims, err := shared.DefaultJwtWs.Parse(token)
 
