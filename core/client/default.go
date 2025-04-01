@@ -94,8 +94,8 @@ func (c *defaultClient) Close() {
 	c.cancel()
 
 	if c.messageChan != nil {
-		c.messageChan = nil
 		close(c.messageChan)
+		c.messageChan = nil
 	}
 	c.socket.Close()
 
