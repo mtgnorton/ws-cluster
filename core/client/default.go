@@ -58,26 +58,29 @@ func (c *defaultClient) Options() Options {
 //}
 
 func (c *defaultClient) Send(ctx context.Context, message interface{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.opts.logger.Warnf(ctx, "PANIC client:%s,send message panic,message is %v,panic is:%v", c, message, r)
+		}
+	}()
 	if c.status.Load() == int32(StatusClosed) {
 		c.opts.logger.Debugf(ctx, "client:%s,send message:%v ,client is closed", c, message)
 		return
 	}
 
 	c.RLock()
-	messageChan := c.messageChan
-	c.RUnlock()
-
-	if messageChan == nil {
+	if c.status.Load() == int32(StatusClosed) || c.messageChan == nil {
+		c.RUnlock()
 		return
 	}
 
 	select {
-	case <-ctx.Done():
-		return
-	case messageChan <- message:
+	case c.messageChan <- message:
 	default:
 		c.opts.logger.Warnf(ctx, "client:%s,send message:%v ,channel is full,dropped", c, message)
 	}
+	c.RUnlock()
+
 }
 
 func (c *defaultClient) Close() {
@@ -91,8 +94,8 @@ func (c *defaultClient) Close() {
 	c.cancel()
 
 	if c.messageChan != nil {
-		close(c.messageChan)
 		c.messageChan = nil
+		close(c.messageChan)
 	}
 	c.socket.Close()
 
@@ -174,7 +177,7 @@ func (c *defaultClient) sendLoop(ctx context.Context) {
 
 			if err := c.socket.WriteJSON(message); err != nil {
 				c.opts.logger.Debugf(ctx, "client:%s send message error:%v", c.ID, err)
-				c.status.Store(int32(StatusClosed))
+				c.Close()
 				return
 			}
 
