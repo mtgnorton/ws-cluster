@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"ws-cluster/clustermessage"
-	"ws-cluster/core/queue/kafka"
+	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"github.com/mtgnorton/ws-cluster/core/queue/kafka"
 
-	"ws-cluster/core/queue/option"
+	"github.com/mtgnorton/ws-cluster/core/queue/option"
 
 	"github.com/IBM/sarama"
 )

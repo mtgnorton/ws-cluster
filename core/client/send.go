@@ -2,7 +2,8 @@ package client
 
 import (
 	"context"
-	"ws-cluster/logger"
+
+	"github.com/mtgnorton/ws-cluster/logger"
 
 	"github.com/gorilla/websocket"
 	"github.com/sasha-s/go-deadlock"

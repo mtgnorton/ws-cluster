@@ -9,7 +9,7 @@ build-linux:
 kill:
 	kill -9 `ps -ef | grep $(NAME) | grep -v grep | awk '{print $$2}'`;
 run-local:build
-	./bin/$(NAME) --queue redis  --env local 
+	./bin/$(NAME) --queue redis  --config conf/config.yaml --env local 
 run-dev:
 	nohup ./bin/$(NAME) --queue redis  --config conf/config.dev.yaml --env dev  >> nohup.out 2>&1 &
 run-prod:
@@ -31,14 +31,19 @@ build-docker:build-linux
 	--build-arg "MAIN_PATH=main.go" \
 	--build-arg "CONFIG_PATH=conf/config.docker.official.yaml" \
 	--build-arg "CONFIG_FILE_NAME=config.docker.official.yaml" \
-	-t mtgnorton/ws-cluster:latest -f Dockerfile .
+	-t mtgnorton/ws-cluster:$(VERSION) -f Dockerfile .
+
+# 使用示例: make build-docker VERSION=1.0.0
+# 如果未指定VERSION，默认使用latest
+VERSION ?= latest
 
 run-docker:
-	docker run --rm --name ws-cluster -p 8084:8084 mtgnorton/ws-cluster:latest --queue redis --config config.docker.yaml
+	docker run --rm --name ws-cluster -p 8084:8084 mtgnorton/ws-cluster:latest --queue redis --config config.docker.official.yaml
 
 push-docker:
-	docker push mtgnorton/ws-cluster:latest
+	docker push mtgnorton/ws-cluster:$(VERSION)
 
+# 使用示例: make bp-docker VERSION=1.0.0
 bp-docker:build-docker push-docker
 
 restart-k8s:

@@ -3,7 +3,7 @@ package wssentry
 import (
 	"context"
 
-	"ws-cluster/config"
+	"github.com/mtgnorton/ws-cluster/config"
 )
 
 type Option func(*Options)

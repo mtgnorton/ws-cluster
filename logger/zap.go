@@ -8,9 +8,9 @@ import (
 
 	"github.com/getsentry/sentry-go"
 
-	"ws-cluster/config"
-	"ws-cluster/shared"
-	"ws-cluster/tools/wssentry"
+	"github.com/mtgnorton/ws-cluster/config"
+	"github.com/mtgnorton/ws-cluster/shared"
+	"github.com/mtgnorton/ws-cluster/tools/wssentry"
 
 	"github.com/TheZeroSlave/zapsentry"
 	"go.uber.org/zap"

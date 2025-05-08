@@ -6,7 +6,7 @@ import (
 
 	"github.com/sasha-s/go-deadlock"
 
-	"ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/core/client"
 )
 
 // Project 属于同一个项目的用户和服务端放在同一个Project中

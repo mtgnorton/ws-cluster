@@ -3,7 +3,8 @@ package checking
 import (
 	"context"
 	"time"
-	"ws-cluster/shared"
+
+	"github.com/mtgnorton/ws-cluster/shared"
 
 	"github.com/redis/go-redis/v9"
 )

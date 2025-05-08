@@ -6,9 +6,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"ws-cluster/logger"
-	"ws-cluster/shared"
-	"ws-cluster/shared/kit"
+	"github.com/mtgnorton/ws-cluster/logger"
+	"github.com/mtgnorton/ws-cluster/shared"
+	"github.com/mtgnorton/ws-cluster/shared/kit"
 
 	"github.com/sasha-s/go-deadlock"
 

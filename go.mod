@@ -1,4 +1,4 @@
-module ws-cluster
+module github.com/mtgnorton/ws-cluster
 
 go 1.22.4
 
@@ -10,6 +10,7 @@ require (
 	github.com/getsentry/sentry-go v0.26.0
 	github.com/gogf/gf/v2 v2.6.1
 	github.com/gorilla/websocket v1.5.0
+	github.com/json-iterator/go v1.1.12
 	github.com/prometheus/client_golang v1.18.0
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/sasha-s/go-deadlock v0.3.5
@@ -56,7 +57,6 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect

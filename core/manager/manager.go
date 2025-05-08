@@ -3,7 +3,7 @@ package manager
 import (
 	"context"
 
-	"ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/core/client"
 )
 
 var DefaultManager = NewManager()

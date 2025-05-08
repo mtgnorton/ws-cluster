@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"ws-cluster/tools/wsprometheus"
+	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 
 	"github.com/sasha-s/go-deadlock"
 
-	"ws-cluster/clustermessage"
-	"ws-cluster/core/queue/option"
+	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"github.com/mtgnorton/ws-cluster/core/queue/option"
 
 	"github.com/redis/go-redis/v9"
 )

@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"ws-cluster/clustermessage"
-	"ws-cluster/config"
+	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"github.com/mtgnorton/ws-cluster/config"
 
-	"ws-cluster/core/queue/option"
+	"github.com/mtgnorton/ws-cluster/core/queue/option"
 )
 
 var QueueInstance Queue

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"ws-cluster/core/client"
-	"ws-cluster/shared/kit"
+	"github.com/mtgnorton/ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/shared/kit"
 
 	"golang.org/x/exp/rand"
 )

@@ -3,7 +3,8 @@ package checking
 import (
 	"context"
 	"testing"
-	"ws-cluster/logger"
+
+	"github.com/mtgnorton/ws-cluster/logger"
 )
 
 func TestChecking_GetPids(t *testing.T) {

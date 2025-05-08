@@ -6,22 +6,23 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"ws-cluster/ws/server"
 
-	"ws-cluster/shared"
+	"github.com/mtgnorton/ws-cluster/ws/server"
 
-	httpServer "ws-cluster/http/server"
+	"github.com/mtgnorton/ws-cluster/shared"
 
-	"ws-cluster/tools/swagger"
-	"ws-cluster/tools/wsprometheus"
+	httpServer "github.com/mtgnorton/ws-cluster/http/server"
+
+	"github.com/mtgnorton/ws-cluster/tools/swagger"
+	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 
 	"github.com/gogf/gf/v2/frame/g"
 	swaggerFiles "github.com/swaggo/files"
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"ws-cluster/config"
-	"ws-cluster/docs"
+	"github.com/mtgnorton/ws-cluster/config"
+	"github.com/mtgnorton/ws-cluster/docs"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/sasha-s/go-deadlock"

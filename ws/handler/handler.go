@@ -3,8 +3,8 @@ package handler
 import (
 	"context"
 
-	"ws-cluster/clustermessage"
-	"ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"github.com/mtgnorton/ws-cluster/core/client"
 )
 
 var DefaultHandler = NewWsHandler()

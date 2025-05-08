@@ -1,6 +1,6 @@
 package logger
 
-import "ws-cluster/config"
+import "github.com/mtgnorton/ws-cluster/config"
 
 type Options struct {
 	configLog    config.Log

@@ -3,7 +3,7 @@ package manager
 import (
 	"context"
 
-	"ws-cluster/logger"
+	"github.com/mtgnorton/ws-cluster/logger"
 )
 
 type Options struct {

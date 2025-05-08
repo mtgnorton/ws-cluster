@@ -3,9 +3,9 @@ package wsprometheus
 import (
 	"context"
 
-	"ws-cluster/logger"
+	"github.com/mtgnorton/ws-cluster/logger"
 
-	"ws-cluster/config"
+	"github.com/mtgnorton/ws-cluster/config"
 )
 
 type Option func(*Options)

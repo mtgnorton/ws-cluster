@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"ws-cluster/config"
-	"ws-cluster/shared/kit"
+	"github.com/mtgnorton/ws-cluster/config"
+	"github.com/mtgnorton/ws-cluster/shared/kit"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/redis/go-redis/v9"

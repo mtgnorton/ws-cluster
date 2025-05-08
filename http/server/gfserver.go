@@ -9,15 +9,15 @@ import (
 
 	"github.com/gogf/gf/v2/util/gutil"
 
-	"ws-cluster/shared"
-	"ws-cluster/shared/auth"
+	"github.com/mtgnorton/ws-cluster/shared"
+	"github.com/mtgnorton/ws-cluster/shared/auth"
 
-	"ws-cluster/clustermessage"
-	"ws-cluster/core/checking"
-	"ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"github.com/mtgnorton/ws-cluster/core/checking"
+	"github.com/mtgnorton/ws-cluster/core/client"
 
-	"ws-cluster/tools/wsprometheus"
-	"ws-cluster/tools/wssentry"
+	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
+	"github.com/mtgnorton/ws-cluster/tools/wssentry"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"

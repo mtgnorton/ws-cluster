@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"ws-cluster/clustermessage"
-	"ws-cluster/core/client"
-	"ws-cluster/shared/kit"
+	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"github.com/mtgnorton/ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/shared/kit"
 )
 
 type WsHandler struct {

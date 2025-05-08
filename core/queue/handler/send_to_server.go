@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"ws-cluster/shared/kit"
+	"github.com/mtgnorton/ws-cluster/shared/kit"
 
-	"ws-cluster/clustermessage"
+	"github.com/mtgnorton/ws-cluster/clustermessage"
 )
 
 // SendToServer 从消息队列接收到用户端的消息，将其转发给服务端
