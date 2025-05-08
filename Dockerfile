@@ -26,8 +26,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 # 复制构建产物
 COPY bin/${APP_NAME}-linux ${APP_NAME}
 COPY ${CONFIG_PATH} ${WORKDIR}/
-
-RUN chmod +x ${APP_NAME}
+RUN  chmod +x ${APP_NAME}
 
 EXPOSE ${APP_PORT}
 
