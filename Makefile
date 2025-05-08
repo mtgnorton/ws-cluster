@@ -9,7 +9,7 @@ build-linux:
 kill:
 	kill -9 `ps -ef | grep $(NAME) | grep -v grep | awk '{print $$2}'`;
 run-local:build
-	./bin/$(NAME) --queue redis  --config conf/config.yaml --env local 
+	./bin/$(NAME) --queue redis  --config conf/config.yaml --env local
 run-dev:
 	nohup ./bin/$(NAME) --queue redis  --config conf/config.dev.yaml --env dev  >> nohup.out 2>&1 &
 run-prod:
