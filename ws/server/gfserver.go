@@ -143,7 +143,7 @@ func (s *gfServer) connect(r *ghttp.Request) {
 	connectMsg := fmt.Sprintf("connect to node:%d success,clientID:%s", nodeID, cID)
 	c.Send(ctx, clustermessage.NewSuccessResp(connectMsg))
 
-	number, _ := s.onlineNumber.LoadOrStore(userData.PID, 1)
+	number, _ := s.onlineNumber.LoadOrStore(userData.PID, 0)
 	s.onlineNumber.Store(userData.PID, number.(int)+1)
 
 	for {
@@ -165,8 +165,14 @@ func (s *gfServer) connect(r *ghttp.Request) {
 			if err != nil {
 				logger.Infof(ctx, "Websocket GetAdd err: %v", err)
 			}
-			number, _ := s.onlineNumber.Load(userData.PID)
-			s.onlineNumber.Store(userData.PID, number.(int)-1)
+			if number, ok := s.onlineNumber.Load(userData.PID); ok {
+				newCount := number.(int) - 1
+				if newCount <= 0 {
+					s.onlineNumber.Delete(userData.PID)
+				} else {
+					s.onlineNumber.Store(userData.PID, newCount)
+				}
+			}
 			return
 		}
 		msg, err := clustermessage.ParseAffair(msgBytes)
