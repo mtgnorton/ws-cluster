@@ -52,6 +52,6 @@ restart-k8s:
 bp-restart:bp-docker restart-k8s
 
 scp:build-linux
-	scp bin/ws-cluster-linux  trade-official:/home/ws-cluster/ws-cluster
+	scp bin/ws-cluster-linux  trade-test:/home/ws-cluster-new/bin/ws-cluster
 scp-config:
 	scp conf/config-linux.yaml trade-official:/home/ws-cluster/

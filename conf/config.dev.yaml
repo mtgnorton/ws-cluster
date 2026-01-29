@@ -47,7 +47,7 @@ prometheus:
   path: /metrics
   addr: :9091
 pprof:
-  enable: false
+  enable: true
   port: 6060
 swagger:
   enable: false

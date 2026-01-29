@@ -2,6 +2,7 @@ package option
 
 import (
 	"context"
+	"time"
 
 	"github.com/mtgnorton/ws-cluster/shared"
 	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
@@ -19,26 +20,32 @@ import (
 )
 
 type Options struct {
-	Ctx         context.Context
-	Config      config.Config
-	Topic       string
-	Logger      logger.Logger
-	Handlers    map[clustermessage.Type]handler.Handle
-	Prometheus  *wsprometheus.Prometheus
-	RedisClient *redis.Client
+	Ctx                context.Context
+	Config             config.Config
+	Topic              string
+	Logger             logger.Logger
+	Handlers           map[clustermessage.Type]handler.Handle
+	Prometheus         *wsprometheus.Prometheus
+	RedisClient        *redis.Client
+	PublishWorkerCount int
+	PublishBatchSize   int
+	PublishTickerMs    time.Duration
 }
 
 type Option func(*Options)
 
 func NewOptions(opts ...Option) Options {
 	options := Options{
-		Ctx:         context.Background(),
-		Config:      config.DefaultConfig,
-		Topic:       qtype.TopicDefault,
-		Logger:      logger.DefaultLogger,
-		Handlers:    make(map[clustermessage.Type]handler.Handle),
-		Prometheus:  wsprometheus.DefaultPrometheus,
-		RedisClient: shared.GetDefaultRedisQueue(),
+		Ctx:                context.Background(),
+		Config:             config.DefaultConfig,
+		Topic:              qtype.TopicDefault,
+		Logger:             logger.DefaultLogger,
+		Handlers:           make(map[clustermessage.Type]handler.Handle),
+		Prometheus:         wsprometheus.DefaultPrometheus,
+		RedisClient:        shared.GetDefaultRedisQueue(),
+		PublishWorkerCount: 1, // 考虑消息顺序问题暂时不开启多worker
+		PublishBatchSize:   500,
+		PublishTickerMs:    5 * time.Millisecond,
 	}
 
 	sendToServerHandler := handler.NewSendToServerHandler()

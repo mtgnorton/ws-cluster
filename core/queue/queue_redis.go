@@ -49,7 +49,9 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 	}
 	go rq.monitor(options.Ctx)
 	go rq.xTrimLoop(options.Ctx)
-	go rq.publishLoop(options.Ctx)
+	for i := 0; i < options.PublishWorkerCount; i++ {
+		go rq.publishLoop(options.Ctx, i)
+	}
 	return rq
 }
 
@@ -71,11 +73,22 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 	}
 }
 
-func (q *redisQueue) publishLoop(ctx context.Context) {
+func (q *redisQueue) publishLoop(ctx context.Context, workerID int) {
+
 	logger := q.opts.Logger
-	cache := make([]*clustermessage.AffairMsg, 0, 200)
-	ticker := time.NewTicker(time.Millisecond * 10)
+	batchSize := q.opts.PublishBatchSize
+	tickerMs := q.opts.PublishTickerMs
+	cache := make([]*clustermessage.AffairMsg, 0, batchSize)
+	ticker := time.NewTicker(tickerMs)
 	defer ticker.Stop()
+
+	flush := func() {
+		if len(cache) > 0 {
+			q.publish(ctx, cache)
+			cache = cache[:0]
+		}
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -84,19 +97,24 @@ func (q *redisQueue) publishLoop(ctx context.Context) {
 				q.publish(flushCtx, cache)
 				cancel()
 			}
-			logger.Infof(ctx, "Redis-publishLoop exit")
+			logger.Infof(ctx, "Redis-publishLoop worker-%d exit", workerID)
 			return
 		case m := <-q.msgCh:
 			cache = append(cache, m)
-			if len(cache) >= 200 {
-				q.publish(ctx, cache)
-				cache = cache[:0]
+			for len(cache) < batchSize {
+				select {
+				case msg := <-q.msgCh:
+					cache = append(cache, msg)
+				default:
+					goto batchReady
+				}
+			}
+		batchReady:
+			if len(cache) >= batchSize {
+				flush()
 			}
 		case <-ticker.C:
-			if len(cache) > 0 {
-				q.publish(ctx, cache)
-				cache = cache[:0]
-			}
+			flush()
 		}
 	}
 }
@@ -248,8 +266,8 @@ func (q *redisQueue) monitor(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			stats := q.opts.RedisClient.PoolStats()
-			q.opts.Logger.Infof(ctx, "Redis pool stats: TotalConns=%d, IdleConns=%d Hits=%d,Misses=%d Timeouts=%d",
-				stats.TotalConns, stats.IdleConns, stats.Hits, stats.Misses, stats.Timeouts)
+			q.opts.Logger.Infof(ctx, "Redis pool stats: TotalConns=%d, IdleConns=%d Hits=%d,Misses=%d Timeouts=%d, msgCh len=%d cap=%d",
+				stats.TotalConns, stats.IdleConns, stats.Hits, stats.Misses, stats.Timeouts, len(q.msgCh), cap(q.msgCh))
 		case <-ctx.Done():
 			return nil
 		}
