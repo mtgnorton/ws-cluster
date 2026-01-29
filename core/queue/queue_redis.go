@@ -66,9 +66,11 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 		return nil
 	case <-ctx.Done():
 		q.opts.Logger.Warnf(ctx, "Redis-Publish canceled, drop msg:%+v", m)
+		_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueDrop, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, 1)
 		return nil
 	case <-timer.C:
 		q.opts.Logger.Warnf(ctx, "Redis-Publish timeout, drop msg:%+v", m)
+		_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueDrop, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, 1)
 		return nil
 	}
 }
@@ -121,6 +123,7 @@ func (q *redisQueue) publishLoop(ctx context.Context, workerID int) {
 
 func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairMsg) {
 	logger := q.opts.Logger
+	beginTime := time.Now()
 	pipe := q.opts.RedisClient.Pipeline()
 	topic := q.opts.Topic
 	validCount := 0
@@ -156,6 +159,7 @@ func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairM
 	}
 	q.publishTimes.Add(int64(validCount))
 	_ = q.opts.Prometheus.GetAdd(wsprometheus.MerticQueueEnter, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, float64(validCount))
+	_ = q.opts.Prometheus.GetObserve(wsprometheus.MertricQueueEnterDuration, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, float64(time.Since(beginTime).Milliseconds()/int64(validCount)))
 
 }
 
@@ -274,10 +278,16 @@ func (q *redisQueue) monitor(ctx context.Context) error {
 	}
 }
 
-// xTrimLoop 每隔30秒执行一次，删除10分钟前的消息
+// xTrimLoop 高频率近似修剪，避免大批量精确删除导致抖动
 func (q *redisQueue) xTrimLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Second * 30)
+	const (
+		trimInterval   = time.Second
+		logInterval    = time.Second * 30
+		trimLimitBatch = int64(20000)
+	)
+	ticker := time.NewTicker(trimInterval)
 	defer ticker.Stop()
+	lastLog := time.Now()
 	for {
 		select {
 		case <-ctx.Done():
@@ -286,14 +296,16 @@ func (q *redisQueue) xTrimLoop(ctx context.Context) {
 			beginTime := time.Now()
 			// 计算10分钟前的时间戳
 			minTime := time.Now().Add(-10 * time.Minute).UnixMilli()
-			c, err := q.opts.RedisClient.XTrimMinID(ctx, q.opts.Topic, strconv.FormatInt(minTime, 10)).Result()
+			c, err := q.opts.RedisClient.XTrimMinIDApprox(ctx, q.opts.Topic, strconv.FormatInt(minTime, 10), trimLimitBatch).Result()
 			if err != nil {
 				q.opts.Logger.Warnf(ctx, "xTrimLoop failed to trim err:%v", err)
 				continue
 			}
-			xLen := q.opts.RedisClient.XLen(ctx, q.opts.Topic).Val()
-
-			q.opts.Logger.Infof(ctx, "xTrimLoop trim count:%d,remain %d,consume :%v ms", c, xLen, time.Since(beginTime).Milliseconds())
+			if time.Since(lastLog) >= logInterval {
+				xLen := q.opts.RedisClient.XLen(ctx, q.opts.Topic).Val()
+				q.opts.Logger.Infof(ctx, "xTrimLoop trim count:%d,remain %d,consume :%v ms", c, xLen, time.Since(beginTime).Milliseconds())
+				lastLog = time.Now()
+			}
 		}
 	}
 }

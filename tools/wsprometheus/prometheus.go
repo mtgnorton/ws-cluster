@@ -15,6 +15,9 @@ const (
 
 	MerticQueueEnter = "queue_enter" // 统计进入队列的消息数量
 	MetricQueueOut   = "queue_out"   // 统计出队列的消息数量
+	MetricQueueDrop  = "queue_drop"  // 统计丢弃的消息数量
+
+	MertricQueueEnterDuration = "queue_enter_duration" // 统计进入队列的消息时间
 
 	MetricQueueHandleDuration = "queue_handle_duration" // 统计队列处理消息的时间
 )
@@ -103,6 +106,19 @@ func (p *Prometheus) init() {
 		Name:        MerticQueueEnter,
 		Description: "queue enter msg  num",
 		Labels:      []string{"node", "ip"},
+	})
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Counter,
+		Name:        MetricQueueDrop,
+		Description: "queue drop msg num.",
+		Labels:      []string{"node", "ip"},
+	})
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Histogram,
+		Name:        MertricQueueEnterDuration,
+		Description: "queue enter msg duration.",
+		Labels:      []string{"node", "ip"},
+		Buckets:     []float64{10, 30, 60, 100, 200, 500, 1000},
 	})
 
 	_ = p.opts.MetricManager.Add(&Metric{
