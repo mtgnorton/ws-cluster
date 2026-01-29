@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgnorton/ws-cluster/shared"
@@ -143,8 +144,8 @@ func (s *gfServer) connect(r *ghttp.Request) {
 	connectMsg := fmt.Sprintf("connect to node:%d success,clientID:%s", nodeID, cID)
 	c.Send(ctx, clustermessage.NewSuccessResp(connectMsg))
 
-	number, _ := s.onlineNumber.LoadOrStore(userData.PID, 0)
-	s.onlineNumber.Store(userData.PID, number.(int)+1)
+	counter, _ := s.onlineNumber.LoadOrStore(userData.PID, &atomic.Int64{})
+	counter.(*atomic.Int64).Add(1)
 
 	for {
 		//if hub := wssentry.GetHubFromContext(r); hub != nil {
@@ -165,13 +166,8 @@ func (s *gfServer) connect(r *ghttp.Request) {
 			if err != nil {
 				logger.Infof(ctx, "Websocket GetAdd err: %v", err)
 			}
-			if number, ok := s.onlineNumber.Load(userData.PID); ok {
-				newCount := number.(int) - 1
-				if newCount <= 0 {
-					s.onlineNumber.Delete(userData.PID)
-				} else {
-					s.onlineNumber.Store(userData.PID, newCount)
-				}
+			if counter, ok := s.onlineNumber.Load(userData.PID); ok {
+				counter.(*atomic.Int64).Add(-1)
 			}
 			return
 		}
@@ -237,8 +233,9 @@ func (s *gfServer) printOnlineNumber() {
 		prompt := "current online number,"
 		total := 0
 		s.onlineNumber.Range(func(key, value any) bool {
-			prompt += fmt.Sprintf(" %s:%d,", key, value)
-			total += value.(int)
+			count := value.(*atomic.Int64).Load()
+			prompt += fmt.Sprintf(" %s:%d,", key, count)
+			total += int(count)
 			return true
 		})
 		prompt += fmt.Sprintf(" total:%d", total)

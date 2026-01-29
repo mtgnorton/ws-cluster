@@ -25,6 +25,7 @@ type redisQueue struct {
 	nodeID       int64
 	nodeIP       string
 	timeoutTimes atomic.Int64
+	msgCh        chan *clustermessage.AffairMsg
 }
 
 func NewRedisQueue(opts ...option.Option) (q Queue) {
@@ -44,9 +45,11 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 		consumeTimes: atomic.Int64{},
 		nodeID:       shared.GetNodeID(),
 		nodeIP:       ip,
+		msgCh:        make(chan *clustermessage.AffairMsg, 100000),
 	}
 	go rq.monitor(options.Ctx)
 	go rq.xTrimLoop(options.Ctx)
+	go rq.publishLoop(options.Ctx)
 	return rq
 }
 
@@ -54,25 +57,88 @@ func (q *redisQueue) Options() option.Options {
 	return q.opts
 }
 func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) error {
-	messageBytes, err := clustermessage.PackAffair(m)
-	if err != nil {
-		return err
+	timer := time.NewTimer(time.Second * 5)
+	defer timer.Stop()
+	select {
+	case q.msgCh <- m:
+		return nil
+	case <-ctx.Done():
+		q.opts.Logger.Warnf(ctx, "Redis-Publish canceled, drop msg:%+v", m)
+		return nil
+	case <-timer.C:
+		q.opts.Logger.Warnf(ctx, "Redis-Publish timeout, drop msg:%+v", m)
+		return nil
 	}
+}
+
+func (q *redisQueue) publishLoop(ctx context.Context) {
+	logger := q.opts.Logger
+	cache := make([]*clustermessage.AffairMsg, 0, 200)
+	ticker := time.NewTicker(time.Millisecond * 10)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			if len(cache) > 0 {
+				flushCtx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+				q.publish(flushCtx, cache)
+				cancel()
+			}
+			logger.Infof(ctx, "Redis-publishLoop exit")
+			return
+		case m := <-q.msgCh:
+			cache = append(cache, m)
+			if len(cache) >= 200 {
+				q.publish(ctx, cache)
+				cache = cache[:0]
+			}
+		case <-ticker.C:
+			if len(cache) > 0 {
+				q.publish(ctx, cache)
+				cache = cache[:0]
+			}
+		}
+	}
+}
+
+func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairMsg) {
+	logger := q.opts.Logger
+	pipe := q.opts.RedisClient.Pipeline()
 	topic := q.opts.Topic
+	validCount := 0
 
-	err = q.opts.RedisClient.XAdd(ctx, &redis.XAddArgs{
-		Stream: string(topic),
-		Values: map[string]interface{}{
-			"m": string(messageBytes),
-		},
-	}).Err()
-	if err != nil {
-		return kit.TransmitError(err)
+	for _, m := range msgs {
+		messageBytes, err := clustermessage.PackAffair(m)
+		if err != nil {
+			logger.Infof(ctx, "Redis-publish msg:%+v packAffair failed,error: %v", m, err)
+			continue
+		}
+		_ = pipe.XAdd(ctx, &redis.XAddArgs{
+			Stream: string(topic),
+			Values: map[string]interface{}{
+				"m": string(messageBytes),
+			},
+		})
+		validCount++
 	}
-	q.publishTimes.Add(1)
-	_ = q.opts.Prometheus.GetAdd(wsprometheus.MerticQueueEnter, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, 1)
 
-	return nil
+	if validCount == 0 {
+		return
+	}
+
+	cmds, err := pipe.Exec(ctx)
+	if err != nil {
+		logger.Warnf(ctx, "Redis-publish pipe.Exec failed, error:%v", err)
+		return
+	}
+	for _, cmd := range cmds {
+		if cmd.Err() != nil {
+			logger.Warnf(ctx, "Redis-publish exec cmd xadd failed, error:%v", cmd.Err())
+		}
+	}
+	q.publishTimes.Add(int64(validCount))
+	_ = q.opts.Prometheus.GetAdd(wsprometheus.MerticQueueEnter, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, float64(validCount))
+
 }
 
 type RedisSamplingData struct {
