@@ -1,6 +1,7 @@
 package server
 
 import (
+	"compress/flate"
 	"context"
 	"fmt"
 	"net/http"
@@ -245,14 +246,17 @@ func (s *gfServer) printOnlineNumber() {
 
 func customSizeWebsocket(r *ghttp.Request, size int) (*ghttp.WebSocket, error) {
 	var upgrader = websocket.Upgrader{
-		WriteBufferSize: size,
-		ReadBufferSize:  size,
+		WriteBufferSize:   size,
+		ReadBufferSize:    size,
+		EnableCompression: true,
 		CheckOrigin: func(r *http.Request) bool {
 			return true // 允许所有来源
 		},
 	}
 
 	if conn, err := upgrader.Upgrade(r.Response.Writer, r.Request, nil); err == nil {
+		// 启用压缩
+		conn.SetCompressionLevel(flate.BestSpeed)
 		return &ghttp.WebSocket{
 			Conn: conn,
 		}, nil
