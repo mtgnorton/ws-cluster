@@ -24,6 +24,7 @@ type redisQueue struct {
 	consumeTimes atomic.Int64
 	nodeID       int64
 	nodeIP       string
+	metricLabels []string
 	timeoutTimes atomic.Int64
 	msgCh        chan *clustermessage.AffairMsg
 }
@@ -37,14 +38,16 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 	options := option.NewOptions(opts...)
 
 	ip := shared.GetInternalIP()
+	nodeID := shared.GetNodeID()
 
 	rq := &redisQueue{
 		opts:         options,
 		startTime:    time.Now(),
 		publishTimes: atomic.Int64{},
 		consumeTimes: atomic.Int64{},
-		nodeID:       shared.GetNodeID(),
+		nodeID:       nodeID,
 		nodeIP:       ip,
+		metricLabels: []string{strconv.FormatInt(nodeID, 10), ip},
 		msgCh:        make(chan *clustermessage.AffairMsg, 100000),
 	}
 	go rq.monitor(options.Ctx)
@@ -59,6 +62,12 @@ func (q *redisQueue) Options() option.Options {
 	return q.opts
 }
 func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) error {
+	select {
+	case q.msgCh <- m:
+		return nil
+	default:
+	}
+
 	timer := time.NewTimer(time.Second * 5)
 	defer timer.Stop()
 	select {
@@ -66,11 +75,11 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 		return nil
 	case <-ctx.Done():
 		q.opts.Logger.Warnf(ctx, "Redis-Publish canceled, drop msg:%+v", m)
-		_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueDrop, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, 1)
+		_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueDrop, q.metricLabels, 1)
 		return nil
 	case <-timer.C:
 		q.opts.Logger.Warnf(ctx, "Redis-Publish timeout, drop msg:%+v", m)
-		_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueDrop, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, 1)
+		_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueDrop, q.metricLabels, 1)
 		return nil
 	}
 }
@@ -125,7 +134,7 @@ func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairM
 	logger := q.opts.Logger
 	beginTime := time.Now()
 	pipe := q.opts.RedisClient.Pipeline()
-	topic := q.opts.Topic
+	topic := string(q.opts.Topic)
 	validCount := 0
 
 	for _, m := range msgs {
@@ -134,12 +143,7 @@ func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairM
 			logger.Infof(ctx, "Redis-publish msg:%+v packAffair failed,error: %v", m, err)
 			continue
 		}
-		_ = pipe.XAdd(ctx, &redis.XAddArgs{
-			Stream: string(topic),
-			Values: map[string]interface{}{
-				"m": string(messageBytes),
-			},
-		})
+		_ = pipe.Do(ctx, "XADD", topic, "*", "m", messageBytes)
 		validCount++
 	}
 
@@ -158,8 +162,12 @@ func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairM
 		}
 	}
 	q.publishTimes.Add(int64(validCount))
-	_ = q.opts.Prometheus.GetAdd(wsprometheus.MerticQueueEnter, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, float64(validCount))
-	_ = q.opts.Prometheus.GetObserve(wsprometheus.MertricQueueEnterDuration, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, float64(time.Since(beginTime).Milliseconds()/int64(validCount)))
+	_ = q.opts.Prometheus.GetAdd(wsprometheus.MerticQueueEnter, q.metricLabels, float64(validCount))
+	_ = q.opts.Prometheus.GetObserve(
+		wsprometheus.MertricQueueEnterDuration,
+		q.metricLabels,
+		float64(time.Since(beginTime).Microseconds())/1000.0/float64(validCount),
+	)
 
 }
 
@@ -225,21 +233,36 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 				averageTime = time.Since(beginTime).Milliseconds() / int64(len(streams[0].Messages))
 			}
 			q.consumeTimes.Add(int64(len(streams[0].Messages)))
-			_ = p.GetObserve(wsprometheus.MetricQueueHandleDuration, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, float64(averageTime))
+			_ = p.GetObserve(wsprometheus.MetricQueueHandleDuration, q.metricLabels, float64(averageTime))
 
-			_ = p.GetAdd(wsprometheus.MetricQueueOut, []string{strconv.FormatInt(q.nodeID, 10), q.nodeIP}, float64(len(streams[0].Messages)))
+			_ = p.GetAdd(wsprometheus.MetricQueueOut, q.metricLabels, float64(len(streams[0].Messages)))
 
 		}()
 
 		for _, msg := range streams[0].Messages {
-			concreteMsgString := msg.Values["m"].(string)
-			concreteMsg, err := clustermessage.ParseAffair([]byte(concreteMsgString))
+			rawMsg, ok := msg.Values["m"]
+			if !ok {
+				logger.Warnf(ctx, "Redis-Consume failed to read msg field m, msgID:%s", msg.ID)
+				continue
+			}
+			var concreteMsgBytes []byte
+			switch v := rawMsg.(type) {
+			case string:
+				concreteMsgBytes = []byte(v)
+			case []byte:
+				concreteMsgBytes = v
+			default:
+				logger.Warnf(ctx, "Redis-Consume unsupported msg field type:%T, msgID:%s", rawMsg, msg.ID)
+				continue
+			}
+
+			concreteMsg, err := clustermessage.ParseAffair(concreteMsgBytes)
 			if err != nil {
-				logger.Warnf(ctx, "Redis-Consume failed to decode msg: %s,err:%v", concreteMsgString, err)
+				logger.Warnf(ctx, "Redis-Consume failed to decode msg: %s,err:%v", string(concreteMsgBytes), err)
 				continue
 			}
 			if _, ok := q.opts.Handlers[concreteMsg.Type]; !ok {
-				logger.Warnf(ctx, "Redis-Consume failed to find handler for msg: %s", concreteMsgString)
+				logger.Warnf(ctx, "Redis-Consume failed to find handler for msg: %s", string(concreteMsgBytes))
 				continue
 			}
 			q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg)
