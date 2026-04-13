@@ -198,14 +198,15 @@ func NewClient(ctx context.Context, uid string, pid string, cType CType, socket 
 		messageChan = make(chan interface{}, 20000)
 	}
 	c := &defaultClient{
-		opts:        opts,
-		ID:          shared.GetSnowflakeNode().Generate().String(),
-		UID:         uid,
-		PID:         pid,
-		cancel:      cancel,
-		cType:       cType,
-		socket:      socket,
-		messageChan: messageChan,
+		opts:             opts,
+		ID:               shared.GetSnowflakeNode().Generate().String(),
+		UID:              uid,
+		PID:              pid,
+		cancel:           cancel,
+		cType:            cType,
+		socket:           socket,
+		messageChan:      messageChan,
+		lastInteractTime: time.Now().Unix(),
 	}
 	c.status.Store(int32(StatusNormal))
 	go c.sendLoop(ctx)
