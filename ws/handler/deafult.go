@@ -33,7 +33,9 @@ func (w *WsHandler) sendClientsLoop() {
 		ctx    = w.opts.ctx
 		logger = w.opts.logger
 	)
-	for range time.Tick(10 * time.Second) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
 		// 获取所有的用户端的连接信息
 		// 遍历所有的服务端
 		// 发送给服务端
@@ -63,7 +65,6 @@ func (w *WsHandler) sendClientsLoop() {
 					},
 					To: nil,
 				}
-				logger.Debugf(ctx, "WsHandler-sendToServer onlineClients msg:%+v", msg)
 				err := w.opts.queue.Publish(ctx, &msg)
 				if err != nil {
 					logger.Warnf(ctx, "WsHandler-sendClientsLoop publish error %v", err)
@@ -112,9 +113,8 @@ func (w *WsHandler) handleMsgFromServer(ctx context.Context, c client.Client, ms
 		logger = w.opts.logger
 		queue  = w.opts.queue
 	)
-	// 如果没有传递到的用户，直接返回
-	if len(msg.To.CIDs) == 0 && len(msg.To.UIDs) == 0 {
-		logger.Infof(ctx, "WsHandler-FromServer msg.To is empty")
+	if msg.To == nil {
+		logger.Warnf(ctx, "WsHandler-FromServer msg.To is nil")
 		return
 	}
 	_, _, msg.To.PID = c.GetIDs()
@@ -124,7 +124,6 @@ func (w *WsHandler) handleMsgFromServer(ctx context.Context, c client.Client, ms
 		logger.Warnf(ctx, "WsHandler-FromServer publish error %v", err)
 		return
 	}
-	logger.Debugf(ctx, "WsHandler-FromServer  msg  success,msg:%+v,To:%+v", msg, msg.To)
 	if msg.AckID != "" {
 		c.Send(ctx, clustermessage.NewAck(msg.AckID))
 	}
@@ -144,7 +143,6 @@ func (w *WsHandler) handleMsgFromUser(ctx context.Context, c client.Client, msg 
 		w.opts.logger.Warnf(ctx, "WsHandler-FromUser user publish error %v", err)
 		return
 	}
-	w.opts.logger.Debugf(ctx, "WsHandler-FromUser  msg  success,msg:%v", msg)
 	if msg.AckID != "" {
 		c.Send(ctx, clustermessage.NewAck(msg.AckID))
 	}

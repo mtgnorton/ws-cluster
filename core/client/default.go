@@ -3,25 +3,21 @@ package client
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/logger"
 	"github.com/mtgnorton/ws-cluster/shared"
 	"github.com/mtgnorton/ws-cluster/shared/kit"
-
-	"github.com/sasha-s/go-deadlock"
+	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 
 	"github.com/gorilla/websocket"
 )
 
-var allClientSendStatistics atomic.Int64
-var allClientSendStatisticsCh = make(chan *atomic.Int64)
-
-func init() {
-	go kit.Sampling(allClientSendStatisticsCh, time.Second*10, 0, func(v *atomic.Int64) {
-		logger.DefaultLogger.Infof(context.Background(), "client send statistics:%v", v.Load())
-	})
+type outboundMessage struct {
+	payload    interface{}
+	enqueuedAt time.Time
 }
 
 type defaultClient struct {
@@ -32,10 +28,13 @@ type defaultClient struct {
 	cancel           context.CancelFunc
 	cType            CType           // 用户端还是服务端
 	socket           *websocket.Conn // 连接
-	lastInteractTime int64
-	messageChan      chan interface{}
+	lastInteractTime atomic.Int64
+	messageChan      chan *outboundMessage
+	metricLabels     []string
+	lastSlowLogAt    atomic.Int64
+	lastDropLogAt    atomic.Int64
 	status           atomic.Int32
-	deadlock.RWMutex
+	sync.RWMutex
 }
 
 func (c *defaultClient) Init(opts ...Option) {
@@ -75,9 +74,15 @@ func (c *defaultClient) Send(ctx context.Context, message interface{}) {
 	}
 
 	select {
-	case c.messageChan <- message:
+	case c.messageChan <- &outboundMessage{
+		payload:    message,
+		enqueuedAt: time.Now(),
+	}:
 	default:
-		c.opts.logger.Warnf(ctx, "client:%s,send message:%v ,channel is full,dropped", c, message)
+		_ = wsprometheus.DefaultPrometheus.GetAdd(wsprometheus.MetricClientSendDrop, c.metricLabels, 1)
+		if kit.AllowByInterval(&c.lastDropLogAt, 2*time.Second) {
+			c.opts.logger.Warnf(ctx, "client:%s send queue full,dropped,len=%d,cap=%d", c.ID, len(c.messageChan), cap(c.messageChan))
+		}
 	}
 	c.RUnlock()
 
@@ -107,44 +112,30 @@ func (c *defaultClient) Status() Status {
 }
 
 func (c *defaultClient) UpdateInteractTime() {
-	c.Lock()
-	defer c.Unlock()
-	c.lastInteractTime = time.Now().Unix()
+	c.lastInteractTime.Store(time.Now().Unix())
 }
 
 func (c *defaultClient) GetInteractTime() int64 {
-	c.RLock()
-	defer c.RUnlock()
-	return c.lastInteractTime
+	return c.lastInteractTime.Load()
 }
 
 func (c *defaultClient) GetIDs() (id string, uid string, pid string) {
-	c.RLock()
-	defer c.RUnlock()
 	return c.ID, c.UID, c.PID
 }
 
 func (c *defaultClient) GetCID() string {
-	c.RLock()
-	defer c.RUnlock()
 	return c.ID
 }
 
 func (c *defaultClient) GetUID() string {
-	c.RLock()
-	defer c.RUnlock()
 	return c.UID
 }
 
 func (c *defaultClient) GetPID() string {
-	c.RLock()
-	defer c.RUnlock()
 	return c.PID
 }
 
 func (c *defaultClient) Type() CType {
-	c.RLock()
-	defer c.RUnlock()
 	return c.cType
 }
 
@@ -175,14 +166,23 @@ func (c *defaultClient) sendLoop(ctx context.Context) {
 				return
 			}
 
-			if err := c.socket.WriteJSON(message); err != nil {
+			queueWaitMs := float64(time.Since(message.enqueuedAt).Microseconds()) / 1000.0
+			_ = wsprometheus.DefaultPrometheus.GetObserve(wsprometheus.MetricClientSendQueueWaitDuration, c.metricLabels, queueWaitMs)
+			if queueWaitMs >= 1000 && kit.AllowByInterval(&c.lastSlowLogAt, 2*time.Second) {
+				c.opts.logger.Warnf(ctx, "client:%s send queue wait=%0.2fms,len=%d,cap=%d,type=%s,pid=%s,message=%s", c.ID, queueWaitMs, len(c.messageChan), cap(c.messageChan), c.cType, c.PID, kit.LogSnippet(message.payload, 240))
+			}
+
+			writeBegin := time.Now()
+			if err := c.socket.WriteJSON(message.payload); err != nil {
 				c.opts.logger.Debugf(ctx, "client:%s send message error:%v", c.ID, err)
 				c.Close()
 				return
 			}
-
-			allClientSendStatistics.Add(1)
-			allClientSendStatisticsCh <- &allClientSendStatistics
+			writeMs := float64(time.Since(writeBegin).Microseconds()) / 1000.0
+			_ = wsprometheus.DefaultPrometheus.GetObserve(wsprometheus.MetricClientWriteDuration, c.metricLabels, writeMs)
+			if writeMs >= 200 && kit.AllowByInterval(&c.lastSlowLogAt, 2*time.Second) {
+				c.opts.logger.Warnf(ctx, "client:%s websocket write slow=%0.2fms,type=%s,pid=%s,message=%s", c.ID, writeMs, c.cType, c.PID, kit.LogSnippet(message.payload, 240))
+			}
 		}
 	}
 }
@@ -193,22 +193,25 @@ func NewClient(ctx context.Context, uid string, pid string, cType CType, socket 
 	options = append(options, WithContext(ctx))
 
 	opts := NewOptions(options...)
-	messageChan := make(chan interface{}, 500)
+	messageChan := make(chan *outboundMessage, 500)
 	if cType == CTypeServer {
-		messageChan = make(chan interface{}, 20000)
+		messageChan = make(chan *outboundMessage, 20000)
 	}
+	nodeID := shared.GetNodeID()
+	nodeIP := shared.GetInternalIP()
 	c := &defaultClient{
-		opts:             opts,
-		ID:               shared.GetSnowflakeNode().Generate().String(),
-		UID:              uid,
-		PID:              pid,
-		cancel:           cancel,
-		cType:            cType,
-		socket:           socket,
-		messageChan:      messageChan,
-		lastInteractTime: time.Now().Unix(),
+		opts:         opts,
+		ID:           shared.GetSnowflakeNode().Generate().String(),
+		UID:          uid,
+		PID:          pid,
+		cancel:       cancel,
+		cType:        cType,
+		socket:       socket,
+		messageChan:  messageChan,
+		metricLabels: []string{strconv.FormatInt(nodeID, 10), nodeIP, cType.String()},
 	}
 	c.status.Store(int32(StatusNormal))
+	c.lastInteractTime.Store(time.Now().Unix())
 	go c.sendLoop(ctx)
 	return c
 }

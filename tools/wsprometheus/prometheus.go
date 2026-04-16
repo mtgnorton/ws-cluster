@@ -19,7 +19,14 @@ const (
 
 	MertricQueueEnterDuration = "queue_enter_duration" // 统计进入队列的消息时间
 
-	MetricQueueHandleDuration = "queue_handle_duration" // 统计队列处理消息的时间
+	MetricQueueHandleDuration      = "queue_handle_duration"       // 统计队列处理消息的时间
+	MetricQueuePublishWaitDuration = "queue_publish_wait_duration" // 统计写入本地发布缓冲区等待时间
+	MetricQueueLagDuration         = "queue_lag_duration"          // 统计消息进入redis后到被消费的等待时间
+	MetricQueueDispatchDuration    = "queue_dispatch_duration"     // 统计单条消息分发处理时间
+
+	MetricClientSendDrop              = "client_send_drop"                // 统计客户端发送队列丢弃次数
+	MetricClientSendQueueWaitDuration = "client_send_queue_wait_duration" // 统计客户端发送队列等待时间
+	MetricClientWriteDuration         = "client_write_duration"           // 统计websocket写入耗时
 )
 
 var DefaultPrometheus = New()
@@ -127,6 +134,47 @@ func (p *Prometheus) init() {
 		Description: "queue handle msg duration.",
 		Labels:      []string{"node", "ip"},
 		Buckets:     []float64{10, 30, 60, 100, 200, 500, 1000},
+	})
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Histogram,
+		Name:        MetricQueuePublishWaitDuration,
+		Description: "queue publish wait duration.",
+		Labels:      []string{"node", "ip"},
+		Buckets:     []float64{1, 5, 10, 20, 50, 100, 500, 1000, 5000},
+	})
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Histogram,
+		Name:        MetricQueueLagDuration,
+		Description: "queue lag duration between redis append and consume.",
+		Labels:      []string{"node", "ip", "type"},
+		Buckets:     []float64{1, 5, 10, 20, 50, 100, 200, 500, 1000, 3000, 5000, 10000},
+	})
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Histogram,
+		Name:        MetricQueueDispatchDuration,
+		Description: "queue single message dispatch duration.",
+		Labels:      []string{"node", "ip", "type"},
+		Buckets:     []float64{0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000},
+	})
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Counter,
+		Name:        MetricClientSendDrop,
+		Description: "client send queue drop count.",
+		Labels:      []string{"node", "ip", "client_type"},
+	})
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Histogram,
+		Name:        MetricClientSendQueueWaitDuration,
+		Description: "client send queue wait duration.",
+		Labels:      []string{"node", "ip", "client_type"},
+		Buckets:     []float64{0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 3000, 5000},
+	})
+	_ = p.opts.MetricManager.Add(&Metric{
+		Type:        Histogram,
+		Name:        MetricClientWriteDuration,
+		Description: "client websocket write duration.",
+		Labels:      []string{"node", "ip", "client_type"},
+		Buckets:     []float64{0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000},
 	})
 
 	http.Handle(p.opts.Config.Values().Prometheus.Path, promhttp.Handler())

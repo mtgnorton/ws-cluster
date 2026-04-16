@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgnorton/ws-cluster/clustermessage"
@@ -11,7 +12,8 @@ import (
 
 // SendToUser 从消息队列接收到业务服务端的消息，将其转发给用户端
 type SendToUser struct {
-	opts *Options
+	opts          *Options
+	lastSlowLogAt atomic.Int64
 }
 
 // SendToUserMessage 收窄发送到用户端消息的字段
@@ -21,53 +23,56 @@ type SendToUserMessage struct {
 }
 
 func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
-	var (
-		source *clustermessage.Source
-		to     *clustermessage.To
-	)
-	if msg.Source != nil {
-		source = msg.Source
-	}
-	if msg.To != nil {
-		to = msg.To
-	}
 	logger, manager, isAck := h.opts.logger, h.opts.manager, true
-	pid, uids, cids := to.PID, to.UIDs, to.CIDs
-
-	end := kit.DoWithTimeout(time.Second*5, func() {
-		logger.Errorf(ctx, "QueueHandler SendToUser Handle msg timeout,msg:%+v", msg)
-	})
-	defer end()
+	if msg.To == nil {
+		logger.Warnf(ctx, "QueueHandler SendToUser msg.To is nil")
+		return
+	}
+	pid, uids, cids := msg.To.PID, msg.To.UIDs, msg.To.CIDs
+	beginTime := time.Now()
 
 	if pid == "" {
-		logger.Infof(ctx, "QueueHandler SendToUser msg pid is empty,msg:%+v,from:%+v,to:%+v", msg.Payload, source, to)
+		logger.Warnf(ctx, "QueueHandler SendToUser msg pid is empty,affair_id:%s", msg.AffairID)
 		return
 	}
 
-	var finalClients []client.Client
-
+	finalClients := make([]client.Client, 0, len(uids)+len(cids))
 	if len(uids) == 0 && len(cids) == 0 {
 		finalClients = manager.ClientsByPIDs(ctx, pid)
 	} else {
+		seen := make(map[string]struct{}, len(uids)+len(cids))
+		appendUnique := func(clients []client.Client) {
+			for _, currentClient := range clients {
+				cid := currentClient.GetCID()
+				if _, ok := seen[cid]; ok {
+					continue
+				}
+				seen[cid] = struct{}{}
+				finalClients = append(finalClients, currentClient)
+			}
+		}
 		if len(uids) > 0 {
-			uClients := manager.ClientsByUIDs(ctx, pid, uids...)
-			finalClients = kit.SliceUnion(finalClients, uClients)
+			appendUnique(manager.ClientsByUIDs(ctx, pid, uids...))
 		}
 		if len(cids) > 0 {
-			clients := manager.Clients(ctx, cids...)
-			finalClients = kit.SliceUnion(finalClients, clients)
+			appendUnique(manager.Clients(ctx, cids...))
 		}
 	}
 	if len(finalClients) == 0 {
-		logger.Debugf(ctx, "QueueHandler SendToUser msg not found client,msg:%+v,from:%+v,to:%+v", msg.Payload, source, to)
 		return
 	}
-	logger.Debugf(ctx, "QueueHandler SendToUser msg to clients:%+v,msg:%+v,from:%+v,to:%+v", finalClients, msg.Payload, source, to)
+
+	sendMsg := SendToUserMessage{
+		AffairID: msg.AffairID,
+		Payload:  msg.Payload,
+	}
 	for _, client := range finalClients {
-		client.Send(ctx, SendToUserMessage{
-			AffairID: msg.AffairID,
-			Payload:  msg.Payload,
-		})
+		client.Send(ctx, sendMsg)
+	}
+
+	costMs := float64(time.Since(beginTime).Microseconds()) / 1000.0
+	if costMs >= 50 && kit.AllowByInterval(&h.lastSlowLogAt, 2*time.Second) {
+		logger.Warnf(ctx, "QueueHandler SendToUser slow=%0.2fms,pid=%s,target=%d,uids=%d,cids=%d,payload=%s", costMs, pid, len(finalClients), len(uids), len(cids), kit.LogSnippet(msg.Payload, 240))
 	}
 	return
 }

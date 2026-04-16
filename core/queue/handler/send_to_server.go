@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgnorton/ws-cluster/shared/kit"
@@ -11,7 +12,8 @@ import (
 
 // SendToServer 从消息队列接收到用户端的消息，将其转发给服务端
 type SendToServer struct {
-	opts *Options
+	opts          *Options
+	lastSlowLogAt atomic.Int64
 }
 
 // SendToServerMessage 收窄发送到业务服务端消息的字段
@@ -28,21 +30,21 @@ func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg
 		manager = h.opts.manager
 	)
 	isAck = true
-	end := kit.DoWithTimeout(time.Second*5, func() {
-		logger.Errorf(ctx, "QueueHandler SendToServer Handle msg timeout,msg:%+v", msg)
-	})
-	defer end()
+	beginTime := time.Now()
 
 	if msg.Source == nil {
 		return
 	}
 	servers := manager.ServersByPID(ctx, msg.Source.PID)
-	logger.Debugf(ctx, "QueueHandler SendToServer msg:%v, servers:%+v", msg, servers)
 	if len(servers) == 0 {
 		return
 	}
 	for _, client := range servers {
 		client.Send(ctx, msg)
+	}
+	costMs := float64(time.Since(beginTime).Microseconds()) / 1000.0
+	if costMs >= 20 && kit.AllowByInterval(&h.lastSlowLogAt, 2*time.Second) {
+		logger.Warnf(ctx, "QueueHandler SendToServer slow=%0.2fms,pid=%s,server_count=%d,type=%s,payload=%s", costMs, msg.Source.PID, len(servers), msg.Type, kit.LogSnippet(msg.Payload, 240))
 	}
 	return
 }

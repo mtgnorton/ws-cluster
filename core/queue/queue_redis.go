@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -25,8 +26,8 @@ type redisQueue struct {
 	nodeID       int64
 	nodeIP       string
 	metricLabels []string
-	timeoutTimes atomic.Int64
 	msgCh        chan *clustermessage.AffairMsg
+	lastSlowLog  atomic.Int64
 }
 
 func NewRedisQueue(opts ...option.Option) (q Queue) {
@@ -62,8 +63,10 @@ func (q *redisQueue) Options() option.Options {
 	return q.opts
 }
 func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) error {
+	beginTime := time.Now()
 	select {
 	case q.msgCh <- m:
+		_ = q.opts.Prometheus.GetObserve(wsprometheus.MetricQueuePublishWaitDuration, q.metricLabels, float64(time.Since(beginTime).Microseconds())/1000.0)
 		return nil
 	default:
 	}
@@ -72,6 +75,11 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 	defer timer.Stop()
 	select {
 	case q.msgCh <- m:
+		waitMs := float64(time.Since(beginTime).Microseconds()) / 1000.0
+		_ = q.opts.Prometheus.GetObserve(wsprometheus.MetricQueuePublishWaitDuration, q.metricLabels, waitMs)
+		if waitMs >= 100 && kit.AllowByInterval(&q.lastSlowLog, 2*time.Second) {
+			q.opts.Logger.Warnf(ctx, "Redis-Publish local queue wait=%0.2fms,len=%d,cap=%d,type=%s,payload=%s", waitMs, len(q.msgCh), cap(q.msgCh), m.Type, kit.LogSnippet(m.Payload, 240))
+		}
 		return nil
 	case <-ctx.Done():
 		q.opts.Logger.Warnf(ctx, "Redis-Publish canceled, drop msg:%+v", m)
@@ -171,13 +179,6 @@ func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairM
 
 }
 
-type RedisSamplingData struct {
-	Msgs         []redis.XMessage
-	ConsumeTime  time.Duration
-	PublishTimes *atomic.Int64
-	ConsumeTimes *atomic.Int64
-}
-
 // Consume 开启一个协程，不断地从redis中读取消息
 func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 	var (
@@ -188,19 +189,10 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 	)
 
 	var currentID = "$"
-	ch := make(chan RedisSamplingData)
-
-	go kit.Sampling(ch, time.Second*2, 0, func(v RedisSamplingData) {
-		if v.ConsumeTime.Milliseconds() > 1000 {
-			logger.Warnf(ctx, "Redis-Consume Has started %v,msg length:%v,consume time:%v ms,publish times:%v,consume times:%v", time.Since(q.startTime), len(v.Msgs), v.ConsumeTime.Milliseconds(), v.PublishTimes.Load(), v.ConsumeTimes.Load())
-			return
-		}
-		logger.Infof(ctx, "Redis-Consume Has started %v,msg length:%v,consume time:%v ms,publish times:%v,consume times:%v", time.Since(q.startTime), len(v.Msgs), v.ConsumeTime.Milliseconds(), v.PublishTimes.Load(), v.ConsumeTimes.Load())
-	})
 
 	f := func() {
 		streams, err := queueRedis.XRead(ctx, &redis.XReadArgs{
-			Streams: []string{string(topic), currentID},
+			Streams: []string{topic},
 			Count:   500,
 			Block:   time.Millisecond * 10,
 			ID:      currentID,
@@ -209,37 +201,34 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 		if err == redis.Nil {
 			return
 		}
-		if len(streams) == 0 {
-			logger.Debugf(ctx, "Redis-Consume  stream length is 0")
-			time.Sleep(time.Second)
-			return
-		}
-
 		if err != nil {
 			logger.Warnf(ctx, "Redis-Consume failed to read:%v", err)
 			return
 		}
+		if len(streams) == 0 {
+			return
+		}
 		beginTime := time.Now()
+		messageCount := len(streams[0].Messages)
+		batchSamples := make([]string, 0, 3)
 
 		defer func() {
-			ch <- RedisSamplingData{
-				Msgs:         streams[0].Messages,
-				ConsumeTime:  time.Since(beginTime),
-				PublishTimes: &q.publishTimes,
-				ConsumeTimes: &q.consumeTimes,
-			}
 			var averageTime int64
-			if len(streams[0].Messages) > 0 {
-				averageTime = time.Since(beginTime).Milliseconds() / int64(len(streams[0].Messages))
+			if messageCount > 0 {
+				averageTime = time.Since(beginTime).Milliseconds() / int64(messageCount)
 			}
-			q.consumeTimes.Add(int64(len(streams[0].Messages)))
+			q.consumeTimes.Add(int64(messageCount))
 			_ = p.GetObserve(wsprometheus.MetricQueueHandleDuration, q.metricLabels, float64(averageTime))
-
-			_ = p.GetAdd(wsprometheus.MetricQueueOut, q.metricLabels, float64(len(streams[0].Messages)))
-
+			_ = p.GetAdd(wsprometheus.MetricQueueOut, q.metricLabels, float64(messageCount))
+			totalMs := float64(time.Since(beginTime).Microseconds()) / 1000.0
+			if totalMs >= 1000 && kit.AllowByInterval(&q.lastSlowLog, 2*time.Second) {
+				logger.Warnf(ctx, "Redis-Consume slow batch=%0.2fms,msg_count=%d,publish_times=%d,consume_times=%d,current_id=%s,samples=%s", totalMs, messageCount, q.publishTimes.Load(), q.consumeTimes.Load(), currentID, kit.JoinLogSnippets(batchSamples))
+			}
 		}()
 
 		for _, msg := range streams[0].Messages {
+			msgType := "unknown"
+			lagMs := streamMessageLagMs(msg.ID)
 			rawMsg, ok := msg.Values["m"]
 			if !ok {
 				logger.Warnf(ctx, "Redis-Consume failed to read msg field m, msgID:%s", msg.ID)
@@ -258,14 +247,31 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 
 			concreteMsg, err := clustermessage.ParseAffair(concreteMsgBytes)
 			if err != nil {
+				if len(batchSamples) < 3 {
+					batchSamples = append(batchSamples, kit.LogSnippet(concreteMsgBytes, 160))
+				}
 				logger.Warnf(ctx, "Redis-Consume failed to decode msg: %s,err:%v", string(concreteMsgBytes), err)
 				continue
+			}
+			msgType = string(concreteMsg.Type)
+			if len(batchSamples) < 3 {
+				batchSamples = append(batchSamples, kit.LogSnippet(concreteMsg.Payload, 160))
+			}
+			_ = p.GetObserve(wsprometheus.MetricQueueLagDuration, append(q.metricLabels, msgType), lagMs)
+			if lagMs >= 1000 && kit.AllowByInterval(&q.lastSlowLog, 2*time.Second) {
+				logger.Warnf(ctx, "Redis-Consume lag=%0.2fms,msg_id=%s,type=%s,msg_count=%d,payload=%s", lagMs, msg.ID, msgType, messageCount, kit.LogSnippet(concreteMsg.Payload, 240))
 			}
 			if _, ok := q.opts.Handlers[concreteMsg.Type]; !ok {
 				logger.Warnf(ctx, "Redis-Consume failed to find handler for msg: %s", string(concreteMsgBytes))
 				continue
 			}
+			dispatchBegin := time.Now()
 			q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg)
+			dispatchMs := float64(time.Since(dispatchBegin).Microseconds()) / 1000.0
+			_ = p.GetObserve(wsprometheus.MetricQueueDispatchDuration, append(q.metricLabels, msgType), dispatchMs)
+			if dispatchMs >= 50 && kit.AllowByInterval(&q.lastSlowLog, 2*time.Second) {
+				logger.Warnf(ctx, "Redis-Consume dispatch slow=%0.2fms,type=%s,msg_id=%s,payload=%s", dispatchMs, msgType, msg.ID, kit.LogSnippet(concreteMsg.Payload, 240))
+			}
 			currentID = msg.ID
 		}
 	}
@@ -276,18 +282,14 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 			logger.Infof(ctx, "Redis-Consume exit")
 			return
 		default:
-			timeoutDetect := kit.DoWithTimeout(time.Second*10, func() {
-				panic("timeout")
-			})
 			f()
-			timeoutDetect()
 		}
 	}
 }
 
 func (q *redisQueue) monitor(ctx context.Context) error {
 	// 定期打印连接池状态
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
@@ -301,10 +303,22 @@ func (q *redisQueue) monitor(ctx context.Context) error {
 	}
 }
 
+func streamMessageLagMs(id string) float64 {
+	parts := strings.SplitN(id, "-", 2)
+	if len(parts) == 0 {
+		return 0
+	}
+	createdAtMs, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0
+	}
+	return float64(time.Now().UnixMilli() - createdAtMs)
+}
+
 // xTrimLoop 高频率近似修剪，避免大批量精确删除导致抖动
 func (q *redisQueue) xTrimLoop(ctx context.Context) {
 	const (
-		trimInterval   = time.Second
+		trimInterval   = time.Second * 5
 		logInterval    = time.Second * 30
 		trimLimitBatch = int64(20000)
 	)

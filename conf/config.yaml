@@ -30,7 +30,7 @@ log:
   compress: false # 是否压缩日志
 redis:
   addr: localhost:6379
-  port: 6379
+  port: 
   user: ""
   password: ""
   db: 3

@@ -2,9 +2,8 @@ package manager
 
 import (
 	"context"
+	"sync"
 	"time"
-
-	"github.com/sasha-s/go-deadlock"
 
 	"github.com/mtgnorton/ws-cluster/core/client"
 )
@@ -21,7 +20,7 @@ type manager struct {
 	opts     Options
 	clients  map[string]client.Client // key:cid value:client
 	projects map[string]Project       // key:pid value:Project
-	deadlock.RWMutex
+	sync.RWMutex
 }
 
 func (m *manager) Join(ctx context.Context, c client.Client) {
@@ -55,19 +54,35 @@ func (m *manager) Remove(ctx context.Context, c client.Client) {
 	cid, uid, pid := c.GetIDs()
 
 	m.Lock()
-	defer m.Unlock()
-
 	if _, ok := m.clients[cid]; !ok {
+		m.Unlock()
 		m.opts.logger.Debugf(ctx, "manager-remove c %s not exist", c)
 		return
 	}
 	delete(m.clients, cid)
-	switch c.Type() {
-	case client.CTypeServer:
-		delete(m.projects[pid].sClients[uid], cid)
-	case client.CTypeUser:
-		delete(m.projects[pid].uClients[uid], cid)
+	if project, ok := m.projects[pid]; ok {
+		switch c.Type() {
+		case client.CTypeServer:
+			if serverClients, ok := project.sClients[uid]; ok {
+				delete(serverClients, cid)
+				if len(serverClients) == 0 {
+					delete(project.sClients, uid)
+				}
+			}
+		case client.CTypeUser:
+			if userClients, ok := project.uClients[uid]; ok {
+				delete(userClients, cid)
+				if len(userClients) == 0 {
+					delete(project.uClients, uid)
+				}
+			}
+		}
+		if len(project.uClients) == 0 && len(project.sClients) == 0 {
+			delete(m.projects, pid)
+		}
 	}
+	m.Unlock()
+
 	c.Close()
 
 	m.opts.logger.Debugf(ctx, "manager-remove c %s", c)
@@ -77,19 +92,18 @@ func (m *manager) Clients(ctx context.Context, clientIDs ...string) []client.Cli
 	m.RLock()
 	defer m.RUnlock()
 
-	clients := make([]client.Client, 0)
+	clients := make([]client.Client, 0, len(clientIDs))
 	if len(clientIDs) == 0 {
+		clients = make([]client.Client, 0, len(m.clients))
 		for _, c := range m.clients {
 			clients = append(clients, c)
 		}
 		return clients
 	}
 	for _, id := range clientIDs {
-		if _, ok := m.clients[id]; !ok {
-			m.opts.logger.Debugf(ctx, "Clients client %s not exist", id)
-			continue
+		if c, ok := m.clients[id]; ok {
+			clients = append(clients, c)
 		}
-		clients = append(clients, m.clients[id])
 	}
 	return clients
 }
@@ -174,17 +188,21 @@ func (m *manager) infiniteCheckExpired(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			expiredClients := make([]client.Client, 0)
 			m.RLock()
 			for _, c := range m.clients {
 				if c.Type() != client.CTypeUser {
 					continue
 				}
 				if time.Now().Unix()-c.GetInteractTime() > 15 {
-					m.opts.logger.Debugf(ctx, "checkExpired client %s expired", c)
-					c.Close()
+					expiredClients = append(expiredClients, c)
 				}
 			}
 			m.RUnlock()
+			for _, expiredClient := range expiredClients {
+				m.opts.logger.Debugf(ctx, "checkExpired client %s expired", expiredClient)
+				expiredClient.Close()
+			}
 		}
 	}
 }
