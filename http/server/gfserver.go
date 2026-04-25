@@ -155,6 +155,11 @@ func (g gfServer) handler(r *ghttp.Request) {
 		Type:    clustermessage.TypePush,
 		To:      &clustermessage.To{PID: userData.PID, UIDs: uids, CIDs: cids},
 	}
+	nodeID := strconv.FormatInt(shared.GetNodeID(), 10)
+	nodeIP := shared.GetInternalIP()
+	clustermessage.EnsureTrace(msg, "")
+	clustermessage.AddTraceEventToMessage(msg, clustermessage.TraceEventTraceMissingFromBiz, nodeID, nodeIP, 0, false)
+	clustermessage.AddTraceEventToMessage(msg, clustermessage.TraceEventWSRecvFromServer, nodeID, nodeIP, 0, false)
 	gutil.Dump(msg)
 
 	// 随机休眠0-10s
@@ -165,6 +170,9 @@ func (g gfServer) handler(r *ghttp.Request) {
 	err = g.opts.queue.Publish(r.Context(), msg)
 	if err != nil {
 		g.opts.logger.Warnf(r.Context(), "publish message error:%s", err.Error())
+		if clustermessage.ShouldLogTrace(msg.Trace, true) {
+			g.opts.logger.Warnf(r.Context(), clustermessage.BuildTraceLogForMessage(msg, nodeID, nodeIP, "ws_publish_failed"))
+		}
 		r.Response.WriteJson(clustermessage.NewErrorResp("publish message error"))
 		return
 	}

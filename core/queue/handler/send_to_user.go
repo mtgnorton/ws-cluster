@@ -2,24 +2,45 @@ package handler
 
 import (
 	"context"
-	"sync/atomic"
+	"strconv"
 	"time"
 
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/client"
-	"github.com/mtgnorton/ws-cluster/shared/kit"
+	"github.com/mtgnorton/ws-cluster/shared"
 )
 
 // SendToUser 从消息队列接收到业务服务端的消息，将其转发给用户端
 type SendToUser struct {
-	opts          *Options
-	lastSlowLogAt atomic.Int64
+	opts *Options
 }
 
 // SendToUserMessage 收窄发送到用户端消息的字段
 type SendToUserMessage struct {
-	AffairID string      `json:"affair_id,omitempty"` // 用户发送消息时，affair_id
-	Payload  interface{} `json:"payload,omitempty"`
+	AffairID string                `json:"affair_id,omitempty"` // 用户发送消息时，affair_id
+	Payload  interface{}           `json:"payload,omitempty"`
+	Trace    *clustermessage.Trace `json:"-"`
+	PID      string                `json:"-"`
+}
+
+func (m SendToUserMessage) MessageTrace() *clustermessage.Trace {
+	return m.Trace
+}
+
+func (m SendToUserMessage) MessageAffairID() string {
+	return m.AffairID
+}
+
+func (m SendToUserMessage) MessageType() clustermessage.Type {
+	return clustermessage.TypePush
+}
+
+func (m SendToUserMessage) MessagePID() string {
+	return m.PID
+}
+
+func (m SendToUserMessage) MessagePayload() interface{} {
+	return m.Payload
 }
 
 func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) (isAck bool) {
@@ -65,14 +86,24 @@ func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) 
 	sendMsg := SendToUserMessage{
 		AffairID: msg.AffairID,
 		Payload:  msg.Payload,
+		Trace:    msg.Trace,
+		PID:      pid,
 	}
+	successCount := 0
 	for _, client := range finalClients {
-		client.Send(ctx, sendMsg)
+		if client.Send(ctx, sendMsg) {
+			successCount++
+		}
 	}
 
-	costMs := float64(time.Since(beginTime).Microseconds()) / 1000.0
-	if costMs >= 50 && kit.AllowByInterval(&h.lastSlowLogAt, 2*time.Second) {
-		logger.Warnf(ctx, "QueueHandler SendToUser slow=%0.2fms,pid=%s,target=%d,uids=%d,cids=%d,payload=%s", costMs, pid, len(finalClients), len(uids), len(cids), kit.LogSnippet(msg.Payload, 240))
+	cost := time.Since(beginTime)
+	costMs := float64(cost.Microseconds()) / 1000.0
+	forceTrace := costMs >= 50 || successCount != len(finalClients)
+	nodeID := strconv.FormatInt(shared.GetNodeID(), 10)
+	nodeIP := shared.GetInternalIP()
+	clustermessage.AddTraceEventToMessage(msg, clustermessage.TraceEventWSDispatchToUserDone, nodeID, nodeIP, clustermessage.DurationMs(cost), forceTrace)
+	if clustermessage.ShouldLogTrace(msg.Trace, forceTrace) {
+		logger.Infof(ctx, clustermessage.BuildTraceLogForMessage(msg, nodeID, nodeIP, "ws_dispatch_to_user_done"))
 	}
 	return
 }
