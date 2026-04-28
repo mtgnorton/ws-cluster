@@ -2,18 +2,15 @@ package handler
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 
-	"github.com/mtgnorton/ws-cluster/shared/kit"
-
 	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"github.com/mtgnorton/ws-cluster/core/tracing"
 )
 
 // SendToServer 从消息队列接收到用户端的消息，将其转发给服务端
 type SendToServer struct {
-	opts          *Options
-	lastSlowLogAt atomic.Int64
+	opts *Options
 }
 
 // SendToServerMessage 收窄发送到业务服务端消息的字段
@@ -39,13 +36,29 @@ func (h *SendToServer) Handle(ctx context.Context, msg *clustermessage.AffairMsg
 	if len(servers) == 0 {
 		return
 	}
+	successCount := 0
 	for _, client := range servers {
-		client.Send(ctx, msg)
+		if client.Send(ctx, msg) {
+			successCount++
+		}
 	}
-	costMs := float64(time.Since(beginTime).Microseconds()) / 1000.0
-	if costMs >= 20 && kit.AllowByInterval(&h.lastSlowLogAt, 2*time.Second) {
-		logger.Warnf(ctx, "QueueHandler SendToServer slow=%0.2fms,pid=%s,server_count=%d,type=%s,payload=%s", costMs, msg.Source.PID, len(servers), msg.Type, kit.LogSnippet(msg.Payload, 240))
+	cost := time.Since(beginTime)
+	costMs := float64(cost.Microseconds()) / 1000.0
+	forceTrace := costMs >= 20 || successCount != len(servers)
+	reason := "ws_dispatch_to_server_done"
+	if forceTrace {
+		reason = "ws_dispatch_to_server_slow_or_drop"
 	}
+	tracing.RecordMessage(ctx, logger, msg, tracing.CurrentNode(), tracing.Event{
+		Name:       tracing.EventWSDispatchToServerDone,
+		Reason:     reason,
+		DurationMs: tracing.DurationMs(cost),
+		Force:      forceTrace,
+		Fields: map[string]any{
+			"target_count":  len(servers),
+			"success_count": successCount,
+		},
+	})
 	return
 }
 

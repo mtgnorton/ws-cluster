@@ -99,6 +99,7 @@ type AffairMsg struct {
 	Type     Type        `json:"type,omitempty"`      // 消息类型
 	Source   *Source     `json:"source,omitempty"`    // WS集群附加Source,代表哪个用户发送
 	To       *To         `json:"to,omitempty"`        // 业务服务端附加To,代表发送给哪些用户
+	Trace    *Trace      `json:"trace,omitempty"`     // 消息链路追踪信息
 }
 
 type Source struct {

@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/mtgnorton/ws-cluster/shared"
-	"github.com/mtgnorton/ws-cluster/shared/kit"
 	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/queue/option"
+	"github.com/mtgnorton/ws-cluster/core/tracing"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -27,7 +27,6 @@ type redisQueue struct {
 	nodeIP       string
 	metricLabels []string
 	msgCh        chan *clustermessage.AffairMsg
-	lastSlowLog  atomic.Int64
 }
 
 func NewRedisQueue(opts ...option.Option) (q Queue) {
@@ -62,11 +61,36 @@ func NewRedisQueue(opts ...option.Option) (q Queue) {
 func (q *redisQueue) Options() option.Options {
 	return q.opts
 }
+
+func (q *redisQueue) node() tracing.Node {
+	return tracing.NodeInfo(strconv.FormatInt(q.nodeID, 10), q.nodeIP)
+}
+
 func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) error {
 	beginTime := time.Now()
+	recordEnqueue := func(wait time.Duration, waitMs float64, force bool) {
+		reason := "ws_publish_enqueue"
+		if force {
+			reason = "ws_publish_enqueue_slow"
+		}
+		tracing.RecordMessage(ctx, q.opts.Logger, m, q.node(), tracing.Event{
+			Name:       tracing.EventWSPublishEnqueue,
+			Reason:     reason,
+			DurationMs: tracing.DurationMs(wait),
+			Force:      force,
+			Fields: map[string]any{
+				"queue_len": len(q.msgCh),
+				"queue_cap": cap(q.msgCh),
+				"wait_ms":   waitMs,
+			},
+		})
+	}
 	select {
 	case q.msgCh <- m:
-		_ = q.opts.Prometheus.GetObserve(wsprometheus.MetricQueuePublishWaitDuration, q.metricLabels, float64(time.Since(beginTime).Microseconds())/1000.0)
+		wait := time.Since(beginTime)
+		waitMs := float64(wait.Microseconds()) / 1000.0
+		_ = q.opts.Prometheus.GetObserve(wsprometheus.MetricQueuePublishWaitDuration, q.metricLabels, waitMs)
+		recordEnqueue(wait, waitMs, false)
 		return nil
 	default:
 	}
@@ -75,18 +99,20 @@ func (q *redisQueue) Publish(ctx context.Context, m *clustermessage.AffairMsg) e
 	defer timer.Stop()
 	select {
 	case q.msgCh <- m:
-		waitMs := float64(time.Since(beginTime).Microseconds()) / 1000.0
+		wait := time.Since(beginTime)
+		waitMs := float64(wait.Microseconds()) / 1000.0
 		_ = q.opts.Prometheus.GetObserve(wsprometheus.MetricQueuePublishWaitDuration, q.metricLabels, waitMs)
-		if waitMs >= 100 && kit.AllowByInterval(&q.lastSlowLog, 2*time.Second) {
-			q.opts.Logger.Warnf(ctx, "Redis-Publish local queue wait=%0.2fms,len=%d,cap=%d,type=%s,payload=%s", waitMs, len(q.msgCh), cap(q.msgCh), m.Type, kit.LogSnippet(m.Payload, 240))
-		}
+		forceTrace := waitMs >= 100
+		recordEnqueue(wait, waitMs, forceTrace)
 		return nil
 	case <-ctx.Done():
 		q.opts.Logger.Warnf(ctx, "Redis-Publish canceled, drop msg:%+v", m)
+		tracing.RecordMessage(ctx, q.opts.Logger, m, q.node(), tracing.Event{Name: tracing.EventWSPublishEnqueue, Reason: "ws_publish_canceled", Force: true, Warn: true})
 		_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueDrop, q.metricLabels, 1)
 		return nil
 	case <-timer.C:
 		q.opts.Logger.Warnf(ctx, "Redis-Publish timeout, drop msg:%+v", m)
+		tracing.RecordMessage(ctx, q.opts.Logger, m, q.node(), tracing.Event{Name: tracing.EventWSPublishEnqueue, Reason: "ws_publish_timeout", Force: true, Warn: true})
 		_ = q.opts.Prometheus.GetAdd(wsprometheus.MetricQueueDrop, q.metricLabels, 1)
 		return nil
 	}
@@ -144,6 +170,7 @@ func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairM
 	pipe := q.opts.RedisClient.Pipeline()
 	topic := string(q.opts.Topic)
 	validCount := 0
+	validMsgs := make([]*clustermessage.AffairMsg, 0, len(msgs))
 
 	for _, m := range msgs {
 		messageBytes, err := clustermessage.PackAffair(m)
@@ -153,6 +180,7 @@ func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairM
 		}
 		_ = pipe.Do(ctx, "XADD", topic, "*", "m", messageBytes)
 		validCount++
+		validMsgs = append(validMsgs, m)
 	}
 
 	if validCount == 0 {
@@ -160,14 +188,44 @@ func (q *redisQueue) publish(ctx context.Context, msgs []*clustermessage.AffairM
 	}
 
 	cmds, err := pipe.Exec(ctx)
+	node := q.node()
 	if err != nil {
 		logger.Warnf(ctx, "Redis-publish pipe.Exec failed, error:%v", err)
+		for _, m := range validMsgs {
+			tracing.RecordMessage(ctx, logger, m, node, tracing.Event{Name: tracing.EventWSRedisXAddFailed, Force: true, Warn: true})
+		}
 		return
 	}
-	for _, cmd := range cmds {
+	xaddDuration := time.Since(beginTime)
+	xaddMs := float64(xaddDuration.Microseconds()) / 1000.0
+	for i, cmd := range cmds {
+		if i >= len(validMsgs) {
+			continue
+		}
+		m := validMsgs[i]
 		if cmd.Err() != nil {
 			logger.Warnf(ctx, "Redis-publish exec cmd xadd failed, error:%v", cmd.Err())
+			tracing.RecordMessage(ctx, logger, m, node, tracing.Event{Name: tracing.EventWSRedisXAddFailed, Force: true, Warn: true})
+			continue
 		}
+		forceTrace := xaddMs >= 100
+		if !tracing.ShouldRecord(m.Trace, forceTrace) {
+			continue
+		}
+		reason := "ws_redis_xadd_done"
+		if forceTrace {
+			reason = "ws_redis_xadd_slow"
+		}
+		tracing.RecordMessage(ctx, logger, m, node, tracing.Event{
+			Name:       tracing.EventWSRedisXAddDone,
+			Reason:     reason,
+			DurationMs: tracing.DurationMs(xaddDuration),
+			Force:      forceTrace,
+			Fields: map[string]any{
+				"batch_size": validCount,
+				"xadd_ms":    xaddMs,
+			},
+		})
 	}
 	q.publishTimes.Add(int64(validCount))
 	_ = q.opts.Prometheus.GetAdd(wsprometheus.MerticQueueEnter, q.metricLabels, float64(validCount))
@@ -210,7 +268,6 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 		}
 		beginTime := time.Now()
 		messageCount := len(streams[0].Messages)
-		batchSamples := make([]string, 0, 3)
 
 		defer func() {
 			var averageTime int64
@@ -220,10 +277,6 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 			q.consumeTimes.Add(int64(messageCount))
 			_ = p.GetObserve(wsprometheus.MetricQueueHandleDuration, q.metricLabels, float64(averageTime))
 			_ = p.GetAdd(wsprometheus.MetricQueueOut, q.metricLabels, float64(messageCount))
-			totalMs := float64(time.Since(beginTime).Microseconds()) / 1000.0
-			if totalMs >= 1000 && kit.AllowByInterval(&q.lastSlowLog, 2*time.Second) {
-				logger.Warnf(ctx, "Redis-Consume slow batch=%0.2fms,msg_count=%d,publish_times=%d,consume_times=%d,current_id=%s,samples=%s", totalMs, messageCount, q.publishTimes.Load(), q.consumeTimes.Load(), currentID, kit.JoinLogSnippets(batchSamples))
-			}
 		}()
 
 		for _, msg := range streams[0].Messages {
@@ -247,20 +300,26 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 
 			concreteMsg, err := clustermessage.ParseAffair(concreteMsgBytes)
 			if err != nil {
-				if len(batchSamples) < 3 {
-					batchSamples = append(batchSamples, kit.LogSnippet(concreteMsgBytes, 160))
-				}
 				logger.Warnf(ctx, "Redis-Consume failed to decode msg: %s,err:%v", string(concreteMsgBytes), err)
 				continue
 			}
 			msgType = string(concreteMsg.Type)
-			if len(batchSamples) < 3 {
-				batchSamples = append(batchSamples, kit.LogSnippet(concreteMsg.Payload, 160))
-			}
 			_ = p.GetObserve(wsprometheus.MetricQueueLagDuration, append(q.metricLabels, msgType), lagMs)
-			if lagMs >= 1000 && kit.AllowByInterval(&q.lastSlowLog, 2*time.Second) {
-				logger.Warnf(ctx, "Redis-Consume lag=%0.2fms,msg_id=%s,type=%s,msg_count=%d,payload=%s", lagMs, msg.ID, msgType, messageCount, kit.LogSnippet(concreteMsg.Payload, 240))
+			lagSlow := lagMs >= 1000
+			reason := "ws_redis_xread"
+			if lagSlow {
+				reason = "ws_redis_xread_lag"
 			}
+			tracing.RecordMessage(ctx, logger, concreteMsg, q.node(), tracing.Event{
+				Name:       tracing.EventWSRedisXRead,
+				Reason:     reason,
+				DurationMs: int64(lagMs),
+				Force:      lagSlow,
+				Fields: map[string]any{
+					"stream_id": msg.ID,
+					"lag_ms":    lagMs,
+				},
+			})
 			if _, ok := q.opts.Handlers[concreteMsg.Type]; !ok {
 				logger.Warnf(ctx, "Redis-Consume failed to find handler for msg: %s", string(concreteMsgBytes))
 				continue
@@ -269,9 +328,17 @@ func (q *redisQueue) Consume(ctx context.Context, _ interface{}) (err error) {
 			q.opts.Handlers[concreteMsg.Type].Handle(ctx, concreteMsg)
 			dispatchMs := float64(time.Since(dispatchBegin).Microseconds()) / 1000.0
 			_ = p.GetObserve(wsprometheus.MetricQueueDispatchDuration, append(q.metricLabels, msgType), dispatchMs)
-			if dispatchMs >= 50 && kit.AllowByInterval(&q.lastSlowLog, 2*time.Second) {
-				logger.Warnf(ctx, "Redis-Consume dispatch slow=%0.2fms,type=%s,msg_id=%s,payload=%s", dispatchMs, msgType, msg.ID, kit.LogSnippet(concreteMsg.Payload, 240))
+			dispatchSlow := dispatchMs >= 50
+			reason = "ws_queue_dispatch_done"
+			if dispatchSlow {
+				reason = "ws_queue_dispatch_slow"
 			}
+			tracing.RecordMessage(ctx, logger, concreteMsg, q.node(), tracing.Event{
+				Name:       tracing.EventWSQueueDispatchDone,
+				Reason:     reason,
+				DurationMs: int64(dispatchMs),
+				Force:      dispatchSlow,
+			})
 			currentID = msg.ID
 		}
 	}

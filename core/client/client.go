@@ -39,7 +39,7 @@ type Client interface {
 	Options() Options
 	//Read(ctx context.Context) (message *wsmessage.Req, isTerminate bool, err error)
 	// message 直接为golang类型
-	Send(ctx context.Context, message interface{})
+	Send(ctx context.Context, message interface{}) bool
 	Close()
 	Status() Status
 	UpdateInteractTime()

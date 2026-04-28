@@ -2,18 +2,16 @@ package handler
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/client"
-	"github.com/mtgnorton/ws-cluster/shared/kit"
+	"github.com/mtgnorton/ws-cluster/core/tracing"
 )
 
 // SendToUser 从消息队列接收到业务服务端的消息，将其转发给用户端
 type SendToUser struct {
-	opts          *Options
-	lastSlowLogAt atomic.Int64
+	opts *Options
 }
 
 // SendToUserMessage 收窄发送到用户端消息的字段
@@ -66,14 +64,40 @@ func (h *SendToUser) Handle(ctx context.Context, msg *clustermessage.AffairMsg) 
 		AffairID: msg.AffairID,
 		Payload:  msg.Payload,
 	}
+	outbound := client.Outbound{
+		Payload: sendMsg,
+		Trace:   msg.Trace,
+		Meta: tracing.Meta{
+			Type:     clustermessage.TypePush,
+			PID:      pid,
+			AffairID: msg.AffairID,
+			Payload:  msg.Payload,
+		},
+	}
+	successCount := 0
 	for _, client := range finalClients {
-		client.Send(ctx, sendMsg)
+		if client.Send(ctx, outbound) {
+			successCount++
+		}
 	}
 
-	costMs := float64(time.Since(beginTime).Microseconds()) / 1000.0
-	if costMs >= 50 && kit.AllowByInterval(&h.lastSlowLogAt, 2*time.Second) {
-		logger.Warnf(ctx, "QueueHandler SendToUser slow=%0.2fms,pid=%s,target=%d,uids=%d,cids=%d,payload=%s", costMs, pid, len(finalClients), len(uids), len(cids), kit.LogSnippet(msg.Payload, 240))
+	cost := time.Since(beginTime)
+	costMs := float64(cost.Microseconds()) / 1000.0
+	forceTrace := costMs >= 50 || successCount != len(finalClients)
+	reason := "ws_dispatch_to_user_done"
+	if forceTrace {
+		reason = "ws_dispatch_to_user_slow_or_drop"
 	}
+	tracing.RecordMessage(ctx, logger, msg, tracing.CurrentNode(), tracing.Event{
+		Name:       tracing.EventWSDispatchToUserDone,
+		Reason:     reason,
+		DurationMs: tracing.DurationMs(cost),
+		Force:      forceTrace,
+		Fields: map[string]any{
+			"target_count":  len(finalClients),
+			"success_count": successCount,
+		},
+	})
 	return
 }
 

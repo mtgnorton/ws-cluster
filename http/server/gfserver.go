@@ -7,14 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gogf/gf/v2/util/gutil"
-
 	"github.com/mtgnorton/ws-cluster/shared"
 	"github.com/mtgnorton/ws-cluster/shared/auth"
 
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/checking"
 	"github.com/mtgnorton/ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/core/tracing"
 
 	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 	"github.com/mtgnorton/ws-cluster/tools/wssentry"
@@ -155,7 +154,9 @@ func (g gfServer) handler(r *ghttp.Request) {
 		Type:    clustermessage.TypePush,
 		To:      &clustermessage.To{PID: userData.PID, UIDs: uids, CIDs: cids},
 	}
-	gutil.Dump(msg)
+	node := tracing.CurrentNode()
+	clustermessage.MaybeStartTrace(msg, "")
+	tracing.RecordMessage(r.Context(), g.opts.logger, msg, node, tracing.Event{Name: tracing.EventWSRecvFromServer})
 
 	// 随机休眠0-10s
 	// time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
@@ -165,6 +166,7 @@ func (g gfServer) handler(r *ghttp.Request) {
 	err = g.opts.queue.Publish(r.Context(), msg)
 	if err != nil {
 		g.opts.logger.Warnf(r.Context(), "publish message error:%s", err.Error())
+		tracing.RecordMessage(r.Context(), g.opts.logger, msg, node, tracing.Event{Name: tracing.EventWSPublishEnqueue, Reason: "ws_publish_failed", Force: true, Warn: true})
 		r.Response.WriteJson(clustermessage.NewErrorResp("publish message error"))
 		return
 	}

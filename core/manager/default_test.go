@@ -91,7 +91,8 @@ func (m *mockClient) Options() client.Options {
 	return client.Options{}
 }
 
-func (m *mockClient) Send(ctx context.Context, message interface{}) {
+func (m *mockClient) Send(ctx context.Context, message interface{}) bool {
+	return true
 }
 
 func (m *mockClient) Status() client.Status {

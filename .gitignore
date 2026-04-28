@@ -28,3 +28,7 @@ bin/
 
 conf/*
 !conf/config.yaml
+
+tmp
+
+prompt.md

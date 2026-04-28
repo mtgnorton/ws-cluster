@@ -8,8 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgnorton/ws-cluster/clustermessage"
+	"github.com/mtgnorton/ws-cluster/core/tracing"
 	"github.com/mtgnorton/ws-cluster/shared"
-	"github.com/mtgnorton/ws-cluster/shared/kit"
 	"github.com/mtgnorton/ws-cluster/tools/wsprometheus"
 
 	"github.com/gorilla/websocket"
@@ -18,6 +19,28 @@ import (
 type outboundMessage struct {
 	payload    interface{}
 	enqueuedAt time.Time
+	trace      *clustermessage.Trace
+	meta       tracing.Meta
+}
+
+type Outbound struct {
+	Payload interface{}
+	Trace   *clustermessage.Trace
+	Meta    tracing.Meta
+}
+
+func (m *outboundMessage) setTrace(trace *clustermessage.Trace) {
+	if m == nil {
+		return
+	}
+	m.trace = trace
+	switch payload := m.payload.(type) {
+	case *clustermessage.AffairMsg:
+		payload.Trace = trace
+	case clustermessage.AffairMsg:
+		payload.Trace = trace
+		m.payload = payload
+	}
 }
 
 type defaultClient struct {
@@ -31,8 +54,7 @@ type defaultClient struct {
 	lastInteractTime atomic.Int64
 	messageChan      chan *outboundMessage
 	metricLabels     []string
-	lastSlowLogAt    atomic.Int64
-	lastDropLogAt    atomic.Int64
+	node             tracing.Node
 	status           atomic.Int32
 	sync.RWMutex
 }
@@ -56,36 +78,38 @@ func (c *defaultClient) Options() Options {
 //	return
 //}
 
-func (c *defaultClient) Send(ctx context.Context, message interface{}) {
+func (c *defaultClient) Send(ctx context.Context, message interface{}) (ok bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			c.opts.logger.Warnf(ctx, "PANIC client:%s,send message panic,message is %v,panic is:%v", c, message, r)
+			ok = false
 		}
 	}()
 	if c.status.Load() == int32(StatusClosed) {
 		c.opts.logger.Debugf(ctx, "client:%s,send message:%v ,client is closed", c, message)
-		return
+		return false
 	}
 
 	c.RLock()
 	if c.status.Load() == int32(StatusClosed) || c.messageChan == nil {
 		c.RUnlock()
-		return
+		return false
 	}
 
+	outbound := prepareOutboundMessage(message)
 	select {
-	case c.messageChan <- &outboundMessage{
-		payload:    message,
-		enqueuedAt: time.Now(),
-	}:
+	case c.messageChan <- outbound:
+		ok = true
 	default:
 		_ = wsprometheus.DefaultPrometheus.GetAdd(wsprometheus.MetricClientSendDrop, c.metricLabels, 1)
-		if kit.AllowByInterval(&c.lastDropLogAt, 2*time.Second) {
-			c.opts.logger.Warnf(ctx, "client:%s send queue full,dropped,len=%d,cap=%d", c.ID, len(c.messageChan), cap(c.messageChan))
-		}
+		tracing.RecordTrace(ctx, c.opts.logger, outbound.trace, outbound.meta, c.node, tracing.Event{
+			Name:  sendQueueFullEvent(c.cType),
+			Force: true,
+			Warn:  true,
+		})
 	}
 	c.RUnlock()
-
+	return ok
 }
 
 func (c *defaultClient) Close() {
@@ -166,23 +190,48 @@ func (c *defaultClient) sendLoop(ctx context.Context) {
 				return
 			}
 
-			queueWaitMs := float64(time.Since(message.enqueuedAt).Microseconds()) / 1000.0
+			queueWait := time.Since(message.enqueuedAt)
+			queueWaitMs := float64(queueWait.Microseconds()) / 1000.0
 			_ = wsprometheus.DefaultPrometheus.GetObserve(wsprometheus.MetricClientSendQueueWaitDuration, c.metricLabels, queueWaitMs)
-			if queueWaitMs >= 1000 && kit.AllowByInterval(&c.lastSlowLogAt, 2*time.Second) {
-				c.opts.logger.Warnf(ctx, "client:%s send queue wait=%0.2fms,len=%d,cap=%d,type=%s,pid=%s,message=%s", c.ID, queueWaitMs, len(c.messageChan), cap(c.messageChan), c.cType, c.PID, kit.LogSnippet(message.payload, 240))
+			queueSlow := queueWaitMs >= 1000
+			reason := "send_queue_dequeue"
+			if queueSlow {
+				reason = "send_queue_wait_slow"
 			}
+			message.setTrace(tracing.RecordTrace(ctx, c.opts.logger, message.trace, message.meta, c.node, tracing.Event{
+				Name:       queueDequeueEvent(c.cType),
+				Reason:     reason,
+				DurationMs: tracing.DurationMs(queueWait),
+				Force:      queueSlow,
+			}))
 
 			writeBegin := time.Now()
 			if err := c.socket.WriteJSON(message.payload); err != nil {
 				c.opts.logger.Debugf(ctx, "client:%s send message error:%v", c.ID, err)
+				message.setTrace(tracing.RecordTrace(ctx, c.opts.logger, message.trace, message.meta, c.node, tracing.Event{
+					Name:       wsWriteFailedEvent(c.cType),
+					Reason:     "ws_write_failed",
+					DurationMs: tracing.DurationMs(time.Since(writeBegin)),
+					Force:      true,
+					Warn:       true,
+				}))
 				c.Close()
 				return
 			}
-			writeMs := float64(time.Since(writeBegin).Microseconds()) / 1000.0
+			writeDuration := time.Since(writeBegin)
+			writeMs := float64(writeDuration.Microseconds()) / 1000.0
 			_ = wsprometheus.DefaultPrometheus.GetObserve(wsprometheus.MetricClientWriteDuration, c.metricLabels, writeMs)
-			if writeMs >= 200 && kit.AllowByInterval(&c.lastSlowLogAt, 2*time.Second) {
-				c.opts.logger.Warnf(ctx, "client:%s websocket write slow=%0.2fms,type=%s,pid=%s,message=%s", c.ID, writeMs, c.cType, c.PID, kit.LogSnippet(message.payload, 240))
+			writeSlow := writeMs >= 200
+			reason = "ws_write_done"
+			if writeSlow {
+				reason = "ws_write_slow"
 			}
+			message.setTrace(tracing.RecordTrace(ctx, c.opts.logger, message.trace, message.meta, c.node, tracing.Event{
+				Name:       wsWriteDoneEvent(c.cType),
+				Reason:     reason,
+				DurationMs: tracing.DurationMs(writeDuration),
+				Force:      writeSlow,
+			}))
 		}
 	}
 }
@@ -209,9 +258,67 @@ func NewClient(ctx context.Context, uid string, pid string, cType CType, socket 
 		socket:       socket,
 		messageChan:  messageChan,
 		metricLabels: []string{strconv.FormatInt(nodeID, 10), nodeIP, cType.String()},
+		node:         tracing.NodeInfo(strconv.FormatInt(nodeID, 10), nodeIP),
 	}
 	c.status.Store(int32(StatusNormal))
 	c.lastInteractTime.Store(time.Now().Unix())
 	go c.sendLoop(ctx)
 	return c
+}
+
+func prepareOutboundMessage(message interface{}) *outboundMessage {
+	outbound := &outboundMessage{
+		payload:    message,
+		enqueuedAt: time.Now(),
+	}
+	switch msg := message.(type) {
+	case Outbound:
+		outbound.payload = msg.Payload
+		outbound.trace = msg.Trace.Clone()
+		outbound.meta = msg.Meta
+	case *clustermessage.AffairMsg:
+		if msg == nil {
+			return outbound
+		}
+		cp := *msg
+		cp.Trace = msg.Trace.Clone()
+		outbound.payload = &cp
+		outbound.trace = cp.Trace
+		outbound.meta = tracing.MetaFromMessage(&cp)
+	case clustermessage.AffairMsg:
+		cp := msg
+		cp.Trace = msg.Trace.Clone()
+		outbound.payload = cp
+		outbound.trace = cp.Trace
+		outbound.meta = tracing.MetaFromMessage(&cp)
+	}
+	return outbound
+}
+
+func queueDequeueEvent(cType CType) string {
+	if cType == CTypeServer {
+		return tracing.EventServerQueueDequeue
+	}
+	return tracing.EventClientQueueDequeue
+}
+
+func wsWriteDoneEvent(cType CType) string {
+	if cType == CTypeServer {
+		return tracing.EventServerWSWriteDone
+	}
+	return tracing.EventClientWSWriteDone
+}
+
+func wsWriteFailedEvent(cType CType) string {
+	if cType == CTypeServer {
+		return tracing.EventServerWSWriteFailed
+	}
+	return tracing.EventClientWSWriteFailed
+}
+
+func sendQueueFullEvent(cType CType) string {
+	if cType == CTypeServer {
+		return tracing.EventServerSendQueueFull
+	}
+	return tracing.EventClientSendQueueFull
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/core/client"
+	"github.com/mtgnorton/ws-cluster/core/tracing"
 	"github.com/mtgnorton/ws-cluster/shared/kit"
 )
 
@@ -112,16 +113,20 @@ func (w *WsHandler) handleMsgFromServer(ctx context.Context, c client.Client, ms
 	var (
 		logger = w.opts.logger
 		queue  = w.opts.queue
+		node   = tracing.CurrentNode()
 	)
 	if msg.To == nil {
 		logger.Warnf(ctx, "WsHandler-FromServer msg.To is nil")
 		return
 	}
 	_, _, msg.To.PID = c.GetIDs()
+	clustermessage.MaybeStartTrace(msg, "")
+	tracing.RecordMessage(ctx, logger, msg, node, tracing.Event{Name: tracing.EventWSRecvFromServer})
 
 	err := queue.Publish(ctx, msg)
 	if err != nil {
 		logger.Warnf(ctx, "WsHandler-FromServer publish error %v", err)
+		tracing.RecordMessage(ctx, logger, msg, node, tracing.Event{Name: tracing.EventWSPublishEnqueue, Reason: "ws_publish_failed", Force: true, Warn: true})
 		return
 	}
 	if msg.AckID != "" {
@@ -132,15 +137,18 @@ func (w *WsHandler) handleMsgFromServer(ctx context.Context, c client.Client, ms
 
 // handleMsgFromUser 来自用户端消息封装
 func (w *WsHandler) handleMsgFromUser(ctx context.Context, c client.Client, msg *clustermessage.AffairMsg) {
+	node := tracing.CurrentNode()
 	cid, uid, pid := c.GetIDs()
 	msg.Source = &clustermessage.Source{
 		PID: pid,
 		UID: uid,
 		CID: cid,
 	}
+	tracing.StartMessage(ctx, w.opts.logger, msg, node, tracing.EventWSRecvFromUser)
 	err := w.opts.queue.Publish(ctx, msg)
 	if err != nil {
 		w.opts.logger.Warnf(ctx, "WsHandler-FromUser user publish error %v", err)
+		tracing.RecordMessage(ctx, w.opts.logger, msg, node, tracing.Event{Name: tracing.EventWSPublishEnqueue, Reason: "ws_publish_failed", Force: true, Warn: true})
 		return
 	}
 	if msg.AckID != "" {
