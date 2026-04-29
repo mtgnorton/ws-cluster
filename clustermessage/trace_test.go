@@ -1,3 +1,4 @@
+// 模块职责说明：验证消息链路 Trace 创建、保留和采样配置行为。
 package clustermessage
 
 import "testing"
@@ -61,5 +62,22 @@ func TestForceTraceCreatesSampledTrace(t *testing.T) {
 	}
 	if !trace.Sampled {
 		t.Fatal("expected forced trace to be sampled")
+	}
+}
+
+func TestShouldSampleUsesConfiguredDenominator(t *testing.T) {
+	oldDenominator := traceSampleDenominator.Load()
+	t.Cleanup(func() {
+		SetTraceSampleDenominator(int(oldDenominator))
+	})
+
+	SetTraceSampleDenominator(1)
+	if !shouldSample("trace-id") {
+		t.Fatal("expected denominator 1 to sample every trace")
+	}
+
+	SetTraceSampleDenominator(0)
+	if shouldSample("trace-id") {
+		t.Fatal("expected denominator 0 to disable random sampling")
 	}
 }

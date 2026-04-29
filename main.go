@@ -1,3 +1,4 @@
+// 模块职责说明：负责 ws-cluster 服务启动、工具服务初始化和优雅关闭。
 package main
 
 import (
@@ -9,6 +10,7 @@ import (
 
 	"github.com/mtgnorton/ws-cluster/ws/server"
 
+	"github.com/mtgnorton/ws-cluster/clustermessage"
 	"github.com/mtgnorton/ws-cluster/shared"
 
 	httpServer "github.com/mtgnorton/ws-cluster/http/server"
@@ -41,6 +43,7 @@ import (
 func main() {
 
 	c := config.DefaultConfig
+	clustermessage.SetTraceSampleDenominator(c.Values().Trace.SampleDenominator)
 	if c.Values().Env == config.Prod {
 		deadlock.Opts.Disable = true
 	}

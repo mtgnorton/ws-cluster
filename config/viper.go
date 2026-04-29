@@ -1,3 +1,4 @@
+// 模块职责说明：负责从命令行、环境变量和 YAML 文件加载运行配置。
 package config
 
 import (
@@ -15,6 +16,7 @@ type viperConfig struct {
 func (c *viperConfig) load() Config {
 	viper.SetEnvPrefix("WS")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+	viper.SetDefault("trace.sample_denominator", 1000)
 
 	// 添加命令行参数
 	pflag.String("config", "", "set config file path")
