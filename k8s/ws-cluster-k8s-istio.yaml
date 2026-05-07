@@ -52,7 +52,23 @@ spec:
       tcp:
         idleTimeout: 1h  # 设置连接空闲超时
     loadBalancer:
-      simple: LEAST_CONN
+      simple: LEAST_REQUEST
+    portLevelSettings:
+    - port:
+        number: 8084
+      connectionPool:
+        http:
+          http1MaxPendingRequests: 10000
+          idleTimeout: 30m  # HTTP/1.1 连接空闲超时
+        tcp:
+          idleTimeout: 1h  # 设置连接空闲超时
+      loadBalancer:
+        consistentHash:
+          # WebSocket 握手是 HTTP Upgrade，Istio 可以读取 URL 中的 uid 参数做哈希
+          httpQueryParameterName: uid
+          ringHash:
+            # 增大虚拟节点数量，让 uid 在少量 Pod 上分布更均匀
+            minimumRingSize: 4096
 ---
 apiVersion: v1
 kind: Service
@@ -63,7 +79,7 @@ spec:
     app: ws-cluster
   type: NodePort
   ports:
-    - name: ws
+    - name: http-ws
       port: 8084
       targetPort: 8084
       protocol: TCP

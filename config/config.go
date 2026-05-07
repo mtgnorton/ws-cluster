@@ -1,3 +1,4 @@
+// 模块职责说明：定义服务运行配置结构和默认配置入口。
 package config
 
 import (
@@ -19,20 +20,21 @@ const (
 )
 
 type Values struct {
-	Env        Env        `mapstructure:"env"`
-	Node       int64      `mapstructure:"node"`
-	Router     Router     `mapstructure:"router"`
-	WsServer   WsServer   `mapstructure:"ws_server"`
-	HttpServer HttpServer `mapstructure:"http_server"`
-	Queue      Queue      `mapstructure:"queue"`
-	Log        Log        `mapstructure:"log"`
-	Redis      Redis      `mapstructure:"redis"`
-	Kafka      Kafka      `mapstructure:"kafka"`
-	Jwt        Jwt        `mapstructure:"jwt"`
-	Sentry     Sentry     `mapstructure:"sentry"`
-	Prometheus Prometheus `mapstructure:"prometheus"`
-	Pprof      Pprof      `mapstructure:"pprof"`
-	Swagger    Swagger    `mapstructure:"swagger"`
+	Env        Env         `mapstructure:"env"`
+	Node       int64       `mapstructure:"node"`
+	Router     Router      `mapstructure:"router"`
+	WsServer   WsServer    `mapstructure:"ws_server"`
+	HttpServer HttpServer  `mapstructure:"http_server"`
+	Queue      Queue       `mapstructure:"queue"`
+	Log        Log         `mapstructure:"log"`
+	Redis      Redis       `mapstructure:"redis"`
+	Kafka      Kafka       `mapstructure:"kafka"`
+	Jwt        Jwt         `mapstructure:"jwt"`
+	Sentry     Sentry      `mapstructure:"sentry"`
+	Trace      TraceConfig `mapstructure:"trace"`
+	Prometheus Prometheus  `mapstructure:"prometheus"`
+	Pprof      Pprof       `mapstructure:"pprof"`
+	Swagger    Swagger     `mapstructure:"swagger"`
 }
 
 type Router struct {
@@ -83,6 +85,11 @@ type Jwt struct {
 type Sentry struct {
 	DSN              string  `mapstructure:"dsn"`
 	TracesSampleRate float64 `mapstructure:"traces_sample_rate"`
+}
+
+// TraceConfig 保存业务链路 Trace 的采样配置，独立于 Sentry SDK 采样。
+type TraceConfig struct {
+	SampleDenominator int `mapstructure:"sample_denominator"`
 }
 
 type Prometheus struct {

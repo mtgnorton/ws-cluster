@@ -9,6 +9,8 @@ ws_server:
   port: 8084 #t(ws_port) websocket服务端口
 http_server:
   port: 8085 #t(http_port) http服务端口
+trace:
+  sample_denominator: 1000 # Trace采样分母，1000表示约1/1000；0表示关闭入口随机采样
 queue:
   use: redis #t(queue) 队列类型 redis, kafka
   redis:
@@ -54,4 +56,3 @@ swagger:
   enable: false
   path: /swagger
   port: 9092
-
